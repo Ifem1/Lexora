@@ -43,7 +43,7 @@ export const FRAMEWORKS: ArbitrationFramework[] = [
       "IP ownership disputes beyond what is specified in contract",
       "Claims for consequential damages or lost profits",
     ],
-    icon: "ðŸ’¼",
+    icon: "💼",
   },
   {
     frameworkId: "digital_service_refund",
@@ -87,7 +87,7 @@ export const FRAMEWORKS: ArbitrationFramework[] = [
       "Claims based on change of mind alone",
       "Disputes exceeding 12 months from purchase date",
     ],
-    icon: "ðŸ”„",
+    icon: "📄",
   },
   {
     frameworkId: "marketplace_order_dispute",
@@ -131,7 +131,7 @@ export const FRAMEWORKS: ArbitrationFramework[] = [
       "Claims for consequential or indirect losses",
       "Disputes based solely on buyer's change of preference",
     ],
-    icon: "ðŸ›’",
+    icon: "🛒",
   },
   {
     frameworkId: "private_agreement_breach",
@@ -175,7 +175,7 @@ export const FRAMEWORKS: ArbitrationFramework[] = [
       "Real property transactions",
       "Family law matters",
     ],
-    icon: "ðŸ“œ",
+    icon: "📜",
   },
   {
     frameworkId: "dao_grant_performance",
@@ -219,7 +219,7 @@ export const FRAMEWORKS: ArbitrationFramework[] = [
       "Disputes involving illegal activities",
       "Claims against DAO smart contracts for bugs or exploits",
     ],
-    icon: "ðŸ›ï¸",
+    icon: "🏛️",
   },
   {
     frameworkId: "small_contractor_completion",
@@ -263,7 +263,7 @@ export const FRAMEWORKS: ArbitrationFramework[] = [
       "Personal injury claims arising from work",
       "Disputes involving licensed professional certifications",
     ],
-    icon: "ðŸ”§",
+    icon: "🔧",
   },
   {
     frameworkId: "content_licensing_dispute",
@@ -307,7 +307,7 @@ export const FRAMEWORKS: ArbitrationFramework[] = [
       "Trademark disputes",
       "Disputes involving open source license compatibility (GPL, AGPL, etc.)",
     ],
-    icon: "Â©ï¸",
+    icon: "©️",
   },
 ];
 
