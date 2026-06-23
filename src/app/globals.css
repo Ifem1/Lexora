@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0B0D10;
+  --foreground: #F1E8D2;
+  --color-obsidian: #0B0D10;
+  --color-parchment: #F1E8D2;
+  --color-brass: #C69C5D;
+  --color-crimson: #7D1F2A;
+  --color-teal: #0E4C4F;
+  --color-ash: #171B20;
+  --color-fog: rgba(241,232,210,0.16);
+  --color-muted-parchment: rgba(241,232,210,0.68);
+  --color-evidence-blue: #6B8FB3;
+  --color-success: #648F70;
+  --color-warning: #C58B3B;
+  --color-danger: #A94343;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: #0B0D10;
+  color: #F1E8D2;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.font-cinzel { font-family: 'Cinzel Decorative', serif; }
+.font-cinzel-reg { font-family: 'Cinzel', serif; }
+.font-space { font-family: 'Space Grotesk', sans-serif; }
+.font-mono-plex { font-family: 'IBM Plex Mono', monospace; }
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #171B20; }
+::-webkit-scrollbar-thumb { background: rgba(241,232,210,0.16); border-radius: 3px; }
