@@ -84,9 +84,9 @@ export default function CaseStatusTimeline({
         return (
           <motion.div
             key={step.status}
-            initial={{ opacity: 0, x: -12 }}
+            initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: i * 0.08, duration: 0.5, ease: [0.25, 0.4, 0.25, 1] as const }}
             className="flex items-start gap-3 relative"
           >
             {/* Vertical line */}
@@ -116,7 +116,8 @@ export default function CaseStatusTimeline({
                   : isDone
                   ? "1.5px solid rgba(198,156,93,0.4)"
                   : "1.5px solid rgba(241,232,210,0.08)",
-                boxShadow: isCurrent ? "0 0 10px rgba(14,76,79,0.5)" : "none",
+                boxShadow: isCurrent ? "0 0 12px rgba(14,76,79,0.5), 0 0 24px rgba(14,76,79,0.2)" : isDone ? "0 0 8px rgba(198,156,93,0.1)" : "none",
+                animation: isCurrent ? "pulse-brass 2s ease-in-out infinite" : "none",
               }}
             >
               <Icon

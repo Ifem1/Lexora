@@ -14,6 +14,8 @@ import ClaimStatementCard from "@/components/cases/ClaimStatementCard";
 import ResponseStatementCard from "@/components/cases/ResponseStatementCard";
 import { FRAMEWORKS } from "@/lib/arbitration/frameworks";
 import { buildReviewPacket, serializeReviewPacket } from "@/lib/genlayer/reviewPacketBuilder";
+import { motion } from "framer-motion";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const STATUS_COLORS: Record<string, string> = {
   RULING_ISSUED: "#648F70",
@@ -127,8 +129,21 @@ export default function CaseRoomPage() {
   if (loading) {
     return (
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "2rem" }}>
-        <div style={{ textAlign: "center", padding: "4rem", color: "rgba(241,232,210,0.4)", fontSize: "0.875rem" }}>
-          Loading case from contract...
+        <div style={{ marginBottom: "1.5rem" }}><Skeleton width="200px" height="0.7rem" /></div>
+        <div style={{ marginBottom: "0.5rem" }}><Skeleton width="400px" height="1.5rem" /></div>
+        <div style={{ marginBottom: "2rem", display: "flex", gap: "0.75rem" }}>
+          <Skeleton width="120px" height="1.5rem" borderRadius="2px" />
+          <Skeleton width="100px" height="1.5rem" borderRadius="2px" />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "1.5rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <Skeleton width="100%" height="200px" borderRadius="4px" />
+            <Skeleton width="100%" height="150px" borderRadius="4px" />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <Skeleton width="100%" height="300px" borderRadius="4px" />
+            <Skeleton width="100%" height="120px" borderRadius="4px" />
+          </div>
         </div>
       </div>
     );
@@ -150,7 +165,11 @@ export default function CaseRoomPage() {
   }
 
   return (
-    <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "2rem" }}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      style={{ maxWidth: "1100px", margin: "0 auto", padding: "2rem" }}>
       {/* Breadcrumb */}
       <div style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: "0.7rem", color: "rgba(241,232,210,0.4)", marginBottom: "1.5rem" }}>
         <Link href="/app/cases" style={{ color: "rgba(241,232,210,0.4)", textDecoration: "none" }}>CASES</Link>
@@ -302,6 +321,6 @@ export default function CaseRoomPage() {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
