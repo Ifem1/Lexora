@@ -101,7 +101,7 @@ export default function PlaygroundPage() {
       {/* Main Layout: 3 column */}
       <div style={{ display: "grid", gridTemplateColumns: "320px 1fr 280px", gap: "1.25rem", marginBottom: "1.5rem" }}>
         {/* Left: Packet */}
-        <ArbitrationPacketPanel packet={packet} />
+        <ArbitrationPacketPanel packet={packet!} />
 
         {/* Center: Validator Grid + Consensus */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
