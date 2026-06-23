@@ -39,16 +39,20 @@ export default function PlaygroundPage() {
   const [ruling, setRuling] = useState<ReturnType<typeof getMockRuling> | null>(null);
   const [showConsole, setShowConsole] = useState(false);
 
-  const sampleCase = MOCK_CASES[0];
-  const framework = FRAMEWORKS.find(f => f.frameworkId === sampleCase.frameworkId)!;
+  const sampleCase = MOCK_CASES[0] ?? null;
+  const framework = sampleCase
+    ? FRAMEWORKS.find(f => f.frameworkId === sampleCase.frameworkId) ?? FRAMEWORKS[0]
+    : FRAMEWORKS[0];
 
-  const packet = buildReviewPacket(
-    sampleCase,
-    framework,
-    "The respondent failed to deliver the final milestone within the agreed timeline. I provided prompt feedback on all revision requests and the work remains incomplete as per the original brief.",
-    "The scope was changed multiple times during delivery and timeline overruns were caused by client revision cycles, not our delay.",
-    [],
-  );
+  const packet = sampleCase && framework
+    ? buildReviewPacket(
+        sampleCase,
+        framework,
+        "The respondent failed to deliver the final milestone within the agreed timeline. I provided prompt feedback on all revision requests and the work remains incomplete as per the original brief.",
+        "The scope was changed multiple times during delivery and timeline overruns were caused by client revision cycles, not our delay.",
+        [],
+      )
+    : null;
 
   function handleRunArbitration() {
     setRunState("running");
