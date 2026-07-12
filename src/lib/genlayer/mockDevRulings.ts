@@ -8,7 +8,7 @@ import type {
 
 /**
  * Returns a realistic mock ruling for development/testing.
- * Used when no contract is deployed or when NEXT_PUBLIC_CONTRACT_ADDRESS is unset.
+ * Used by the standalone playground; production case flows use CONTRACT_ADDRESS.
  */
 export function getMockRuling(
   caseId: string,

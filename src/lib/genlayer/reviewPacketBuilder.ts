@@ -44,13 +44,15 @@ export function buildReviewPacket(
     ...proceduralState,
   };
 
+  const retainedEvidence = evidence.filter((e) => e.caseId === caseData.caseId);
+
   return {
     caseId: caseData.caseId,
     category: caseData.category,
     framework,
     claimantStatement: claimantStatement.trim(),
     respondentStatement: respondentStatement?.trim() ?? "",
-    evidence: evidence.filter((e) => e.caseId === caseData.caseId),
+    evidence: retainedEvidence,
     proceduralState: enrichedProceduralState,
   };
 }

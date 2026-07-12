@@ -57,13 +57,13 @@ npm install
 Copy `.env.local` (already provided) and fill in your deployed contract address:
 
 ```
-NEXT_PUBLIC_CONTRACT_ADDRESS=<your deployed LexoraArbitration address>
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x2682b8C00e2a7dA837596764eC3b3E35Ef9e801B
 NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 NEXT_PUBLIC_CHAIN_ID=61999
 NEXT_PUBLIC_DEV_MODE=true
 ```
 
-- `NEXT_PUBLIC_CONTRACT_ADDRESS` — leave blank during local dev; the app will operate in mock mode when `NEXT_PUBLIC_DEV_MODE=true`.
+- `NEXT_PUBLIC_CONTRACT_ADDRESS` — the deployed Lexora arbitration contract address (the production client currently pins this address).
 - `NEXT_PUBLIC_CHAIN_ID` — `61999` for localnet, `961` for GenLayer Testnet.
 
 ### Development Server

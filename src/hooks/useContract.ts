@@ -7,7 +7,6 @@ import type {
   ArbitrationCase,
   ArbitrationRuling,
   ArbitrationFramework,
-  EvidencePacket,
 } from "@/lib/genlayer/types";
 
 // ─── Protocol Stats Type ──────────────────────────────────────────────────────
@@ -121,10 +120,12 @@ export function useContract() {
       const raw = await readContract("can_request_ruling", [caseId]);
       if (raw === null || raw === undefined) return false;
       if (typeof raw === "boolean") return raw;
-      const parsed = parseJsonResult<boolean | { result: boolean }>(raw);
+      const parsed = parseJsonResult<boolean | { canRequest?: boolean; result?: boolean }>(raw);
       if (typeof parsed === "boolean") return parsed;
-      if (typeof parsed === "object" && parsed !== null && "result" in parsed)
-        return Boolean((parsed as { result: boolean }).result);
+      if (typeof parsed === "object" && parsed !== null) {
+        if ("canRequest" in parsed) return parsed.canRequest === true;
+        if ("result" in parsed) return parsed.result === true;
+      }
       return false;
     } catch (err) {
       console.error("[useContract] canRequestRuling failed:", err);
@@ -181,8 +182,7 @@ export function useContract() {
   }): Promise<`0x${string}`> {
     const addr = requireAccount();
     // Contract: submit_claim(case_id, claim_hash, evidence_root, claim_summary_hash)
-    const claimHash = `0x${Array.from(new TextEncoder().encode(params.claimStatement))
-      .map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 64)}`;
+    const claimHash = `0x${await crypto.subtle.digest("SHA-256", new TextEncoder().encode(params.claimStatement)).then(b => Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, "0")).join(""))}`;
     return writeContract(addr, "submit_claim", [
       params.caseId,
       claimHash,
@@ -198,8 +198,7 @@ export function useContract() {
   }): Promise<`0x${string}`> {
     const addr = requireAccount();
     // Contract: submit_response(case_id, response_hash, evidence_root)
-    const responseHash = `0x${Array.from(new TextEncoder().encode(params.responseStatement))
-      .map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 64)}`;
+    const responseHash = `0x${await crypto.subtle.digest("SHA-256", new TextEncoder().encode(params.responseStatement)).then(b => Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, "0")).join(""))}`;
     return writeContract(addr, "submit_response", [
       params.caseId,
       responseHash,

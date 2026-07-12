@@ -10,10 +10,14 @@ import EvidenceVault from "@/components/evidence/EvidenceVault";
 import EvidenceUploadPanel from "@/components/evidence/EvidenceUploadPanel";
 import EvidenceHashPanel from "@/components/evidence/EvidenceHashPanel";
 import type { EvidenceManifest } from "@/lib/genlayer/types";
+import { useAccount } from "wagmi";
+import { hashString } from "@/lib/utils/hashes";
+import { loadCaseDossier, retainEvidence } from "@/lib/genlayer/caseDossier";
 
 export default function EvidencePage() {
   const params = useParams();
   const caseId = params?.id as string;
+  const { address } = useAccount();
 
   const { caseData, loading, refresh } = useCase(caseId);
   const { submitEvidence } = useContract();
@@ -38,8 +42,7 @@ export default function EvidencePage() {
     try {
       // Hash the evidence manifest locally — only the hash goes on-chain
       const manifestStr = JSON.stringify({ caseId: caseData.caseId, ...evidenceData });
-      const manifestHash = `0x${Array.from(new TextEncoder().encode(manifestStr))
-        .map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 64)}`;
+      const manifestHash = `0x${await hashString(manifestStr)}`;
       const txHash = await submitEvidence({
         caseId: caseData.caseId,
         evidenceManifestHash: manifestHash,
@@ -47,6 +50,7 @@ export default function EvidencePage() {
       });
       setTxStatus("Waiting for validators...");
       await waitForRuling(txHash);
+      retainEvidence(caseData.caseId, address ?? "unknown", evidenceData);
       setTxStatus("Evidence submitted. Refreshing...");
       await refresh();
     } catch (err: unknown) {
@@ -67,11 +71,12 @@ export default function EvidencePage() {
     );
   }
 
+  const retainedEvidence = loadCaseDossier(caseId).evidence;
   const manifest: EvidenceManifest = {
     caseId: caseData?.caseId ?? caseId,
-    evidenceItems: [],
+    evidenceItems: retainedEvidence,
     manifestHash: caseData?.evidenceRoot ?? "0x0000000000000000000000000000000000000000000000000000000000000000",
-    createdAt: Math.floor(Date.now() / 1000),
+    createdAt: retainedEvidence.at(-1)?.createdAt ?? 0,
   };
 
   return (
@@ -108,7 +113,7 @@ export default function EvidencePage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1.5rem", alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <EvidenceVault evidence={[]} />
+          <EvidenceVault evidence={retainedEvidence} />
           <EvidenceUploadPanel
             onSubmit={handleSubmitEvidence}
             submitting={txPending}

@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { CardSkeleton, StatSkeleton } from "@/components/ui/Skeleton";
 import type { ProtocolStats } from "@/hooks/useContract";
+import { CONTRACT_ADDRESS } from "@/lib/genlayer/client";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -215,7 +216,7 @@ export default function AppPage() {
         >
           <div style={{ fontSize: "0.7rem", color: "rgba(241,232,210,0.4)", fontFamily: "var(--font-ibm-plex-mono), monospace", marginBottom: "0.25rem" }}>CONTRACT ADDRESS</div>
           <div style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: "0.8rem", color: "#C69C5D" }}>
-            {process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "Not configured"}
+            {CONTRACT_ADDRESS}
           </div>
           <div style={{ fontSize: "0.7rem", color: "rgba(241,232,210,0.4)", fontFamily: "var(--font-ibm-plex-mono), monospace", marginTop: "0.75rem", marginBottom: "0.25rem" }}>NETWORK</div>
           <div style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: "0.8rem", color: "rgba(241,232,210,0.6)" }}>

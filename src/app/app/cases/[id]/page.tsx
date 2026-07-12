@@ -16,6 +16,7 @@ import { FRAMEWORKS } from "@/lib/arbitration/frameworks";
 import { buildReviewPacket, serializeReviewPacket } from "@/lib/genlayer/reviewPacketBuilder";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { loadCaseDossier, retainStatement } from "@/lib/genlayer/caseDossier";
 
 const STATUS_COLORS: Record<string, string> = {
   RULING_ISSUED: "#648F70",
@@ -62,6 +63,7 @@ export default function CaseRoomPage() {
       });
       setTxStatus("Waiting for validators...");
       await waitForRuling(txHash);
+      retainStatement(caseData.caseId, "claimant", claimText.trim());
       setTxStatus("Claim submitted. Refreshing...");
       await refresh();
       setClaimText("");
@@ -85,6 +87,7 @@ export default function CaseRoomPage() {
       });
       setTxStatus("Waiting for validators...");
       await waitForRuling(txHash);
+      retainStatement(caseData.caseId, "respondent", responseText.trim());
       setTxStatus("Response submitted. Refreshing...");
       await refresh();
       setResponseText("");
@@ -102,12 +105,13 @@ export default function CaseRoomPage() {
     setTxPending(true);
     setTxStatus("Building review packet...");
     try {
+      const dossier = loadCaseDossier(caseData.caseId);
       const packet = buildReviewPacket(
         caseData,
         framework,
-        caseData.claimHash, // statement stored as hash on-chain; pass hash as proxy
-        caseData.responseHash ?? "",
-        [],
+        dossier.claimantStatement,
+        dossier.respondentStatement,
+        dossier.evidence,
         {}
       );
       const packetJson = serializeReviewPacket(packet);

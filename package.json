@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
+    ,"test": "node --experimental-strip-types --test src/lib/genlayer/reviewPacketBuilder.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
