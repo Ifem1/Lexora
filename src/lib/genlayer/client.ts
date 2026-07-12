@@ -3,7 +3,7 @@ import { createClient, chains } from "genlayer-js";
 // ─── Contract Address ─────────────────────────────────────────────────────────
 
 export const CONTRACT_ADDRESS =
-  "0x2682b8C00e2a7dA837596764eC3b3E35Ef9e801B" as const;
+  "0x9Be2516aFDbD102d89D7164187599Aa052E51673" as const;
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_GENLAYER_RPC_URL ?? "https://studio.genlayer.com/api";
@@ -11,6 +11,9 @@ const RPC_URL =
 // ─── Singleton Client ─────────────────────────────────────────────────────────
 
 type GenLayerClientType = ReturnType<typeof createClient>;
+export type GenLayerWalletProvider = NonNullable<
+  Parameters<typeof createClient>[0]
+>["provider"];
 let _client: GenLayerClientType | null = null;
 
 /**
@@ -66,14 +69,22 @@ export async function writeContract(
   account: `0x${string}`,
   method: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  args: any[] = []
+  args: any[] = [],
+  provider?: GenLayerWalletProvider
 ): Promise<`0x${string}`> {
-  const client = getGenLayerClient();
+  // Write calls must be backed by the connected MetaMask GenLayer Snap.
+  // Passing only an address to the read-only HTTP client falls back to
+  // eth_sendTransaction, which Studionet intentionally does not expose.
+  const client = createClient({
+    chain: {
+      ...chains.studionet,
+      rpcUrls: { default: { http: [RPC_URL] as readonly string[] } },
+    },
+    account,
+    provider,
+  });
 
   const txHash = await client.writeContract({
-    account: { address: account } as Parameters<
-      typeof client.writeContract
-    >[0]["account"],
     address: CONTRACT_ADDRESS,
     functionName: method,
     args,
@@ -100,6 +111,17 @@ export async function waitForRuling(txHash: `0x${string}`): Promise<unknown> {
     retries: 120,
     interval: 5000,
   });
+
+  const leaderReceipt = (receipt as {
+    consensus_data?: { leader_receipt?: Array<{
+      execution_result?: string;
+      genvm_result?: { stderr?: string };
+    }> };
+  }).consensus_data?.leader_receipt?.[0];
+  if (leaderReceipt?.execution_result === "ERROR") {
+    const detail = leaderReceipt.genvm_result?.stderr?.trim();
+    throw new Error(detail || "The contract rejected this transaction.");
+  }
 
   return receipt;
 }

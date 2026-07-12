@@ -1116,8 +1116,7 @@ class LexoraArbitration(gl.Contract):
         def get_ruling_from_ai() -> str:
             web_sources = ""
             for idx, url in enumerate(source_urls, 1):
-                response = gl.nondet.web.get(url)
-                assert response.status_code >= 200 and response.status_code < 300, f"Evidence source returned HTTP {response.status_code}."
+                response = gl.nondet.web.request(url, method="GET")
                 content = response.body.decode("utf-8")[:20000]
                 web_sources += f"\n\nWEB SOURCE [{idx}]\nURL: {url}\nCONTENT:\n{content}"
             web_instruction = (

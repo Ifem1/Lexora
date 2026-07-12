@@ -2,6 +2,7 @@
 
 import { useWalletClient } from "wagmi";
 import { readContract, writeContract, waitForRuling } from "@/lib/genlayer/client";
+import type { GenLayerWalletProvider } from "@/lib/genlayer/client";
 import { mapCaseFromChain, mapRulingFromChain } from "@/lib/genlayer/arbitrationMapper";
 import type {
   ArbitrationCase,
@@ -33,6 +34,7 @@ export function useContract() {
   const { data: walletClient } = useWalletClient();
 
   const account = walletClient?.account?.address;
+  const provider = walletClient as unknown as GenLayerWalletProvider;
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -171,7 +173,7 @@ export function useContract() {
       params.respondent,
       params.responseDeadlineDays ?? 7,
       false,
-    ]);
+    ], provider);
     return { txHash };
   }
 
@@ -188,7 +190,7 @@ export function useContract() {
       claimHash,
       params.evidenceRoot ?? "",
       claimHash,
-    ]);
+    ], provider);
   }
 
   async function submitResponse(params: {
@@ -203,7 +205,7 @@ export function useContract() {
       params.caseId,
       responseHash,
       params.evidenceRoot ?? "",
-    ]);
+    ], provider);
   }
 
   async function submitEvidence(params: {
@@ -217,7 +219,7 @@ export function useContract() {
       params.caseId,
       params.evidenceManifestHash,
       params.evidenceRoot,
-    ]);
+    ], provider);
   }
 
   async function requestRuling(
@@ -225,7 +227,7 @@ export function useContract() {
     reviewPacket: string
   ): Promise<`0x${string}`> {
     const addr = requireAccount();
-    return writeContract(addr, "request_ruling", [caseId, reviewPacket]);
+    return writeContract(addr, "request_ruling", [caseId, reviewPacket], provider);
   }
 
   async function acceptRuling(
@@ -233,7 +235,7 @@ export function useContract() {
     rulingId: string
   ): Promise<`0x${string}`> {
     const addr = requireAccount();
-    return writeContract(addr, "accept_ruling", [caseId, rulingId]);
+    return writeContract(addr, "accept_ruling", [caseId, rulingId], provider);
   }
 
   async function appealRuling(
@@ -241,17 +243,17 @@ export function useContract() {
     appealPacket: string
   ): Promise<`0x${string}`> {
     const addr = requireAccount();
-    return writeContract(addr, "appeal_ruling", [caseId, appealPacket]);
+    return writeContract(addr, "appeal_ruling", [caseId, appealPacket], provider);
   }
 
   async function cancelCase(caseId: string): Promise<`0x${string}`> {
     const addr = requireAccount();
-    return writeContract(addr, "cancel_case", [caseId]);
+    return writeContract(addr, "cancel_case", [caseId], provider);
   }
 
   async function markSettled(caseId: string): Promise<`0x${string}`> {
     const addr = requireAccount();
-    return writeContract(addr, "mark_settled", [caseId]);
+    return writeContract(addr, "mark_settled", [caseId], provider);
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
