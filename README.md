@@ -57,7 +57,7 @@ npm install
 Copy `.env.local` (already provided) and fill in your deployed contract address:
 
 ```
-NEXT_PUBLIC_CONTRACT_ADDRESS=0x6294fAcFe830177BBfCc4be306146F76d061e603
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x8cC87a0fC2ffA4E0360F0a5b38B3B0F7a14D3952
 NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 NEXT_PUBLIC_CHAIN_ID=61999
 NEXT_PUBLIC_DEV_MODE=true

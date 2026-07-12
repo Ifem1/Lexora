@@ -106,7 +106,7 @@ export default function CaseRoomPage() {
     setTxStatus("Building review packet...");
     try {
       const dossier = loadCaseDossier(caseData.caseId);
-      const packet = buildReviewPacket(
+      const packet = await buildReviewPacket(
         caseData,
         framework,
         dossier.claimantStatement,

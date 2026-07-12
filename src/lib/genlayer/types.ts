@@ -157,6 +157,8 @@ export type ReviewPacket = {
   claimantStatement: string;
   respondentStatement: string;
   evidence: EvidencePacket[];
+  evidenceCommitment: string;
+  packetCommitment: string;
   proceduralState: Record<string, unknown>;
 };
 

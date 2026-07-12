@@ -444,6 +444,28 @@ class LexoraArbitration(gl.Contract):
     def _rulebook(self, framework_id: str) -> dict:
         return FRAMEWORK_RULEBOOKS.get(framework_id, {})
 
+    def _frame_commitment_value(self, value) -> str:
+        text = "" if value is None else str(value)
+        return f"{len(text.encode('utf-8'))}:{text}"
+
+    def _evidence_commitment(self, evidence: list) -> str:
+        fields = ["evidenceId", "caseId", "submittedBy", "evidenceType", "title",
+                  "summary", "fileHash", "storageUri", "sourceUrl", "relevanceTag", "createdAt"]
+        items = []
+        for item in sorted(evidence, key=lambda entry: str(entry.get("evidenceId", ""))):
+            canonical = "".join(self._frame_commitment_value(item.get(field)) for field in fields)
+            items.append(self._frame_commitment_value(canonical))
+        return "0x" + hashlib.sha256("".join(items).encode()).hexdigest()
+
+    def _packet_commitment(self, case_id: str, framework_id: str,
+                           claimant_statement: str, respondent_statement: str,
+                           evidence_commitment: str, claim_hash: str,
+                           response_hash: str, evidence_root: str) -> str:
+        values = [case_id, framework_id, claimant_statement, respondent_statement,
+                  evidence_commitment, claim_hash, response_hash or None, evidence_root or None]
+        canonical = "".join(self._frame_commitment_value(value) for value in values)
+        return "0x" + hashlib.sha256(canonical.encode()).hexdigest()
+
     def _review_source_urls(self, review_packet: dict) -> list:
         """Return a small, safe set of public HTTPS evidence URLs."""
         urls = []
@@ -1087,6 +1109,14 @@ class LexoraArbitration(gl.Contract):
         assert packet_state.get("evidenceRoot") == (case.evidence_root or None), "Review packet evidence commitment mismatch."
 
         framework_id = case.framework_id
+        evidence_commitment = self._evidence_commitment(review_packet.get("evidence", []))
+        assert evidence_commitment == case.evidence_root, "Retained evidence does not match its stored commitment."
+        assert review_packet.get("evidenceCommitment") == evidence_commitment, "Review packet evidence digest mismatch."
+        expected_packet_commitment = self._packet_commitment(
+            case_id, framework_id, claimant_statement, respondent_statement,
+            evidence_commitment, case.claim_hash, case.response_hash, case.evidence_root,
+        )
+        assert review_packet.get("packetCommitment") == expected_packet_commitment, "Ruling packet commitment mismatch."
         ruling_id    = self._next_ruling_id()
         prompt       = self._build_ruling_prompt(review_packet, framework_id)
         source_urls  = self._review_source_urls(review_packet)
@@ -1105,6 +1135,7 @@ class LexoraArbitration(gl.Contract):
                 "ruling_id": ruling_id,
                 "framework_id": framework_id,
                 "evidence_root": case.evidence_root,
+                "packet_commitment": expected_packet_commitment,
             }),
         )
 

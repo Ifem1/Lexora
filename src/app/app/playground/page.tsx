@@ -8,7 +8,7 @@ import RemedySimulator from "@/components/playground/RemedySimulator";
 import ArbitrationConsole from "@/components/layout/ArbitrationConsole";
 import { getMockRuling, MOCK_CASES } from "@/lib/genlayer/mockDevRulings";
 import { FRAMEWORKS } from "@/lib/arbitration/frameworks";
-import { buildReviewPacket } from "@/lib/genlayer/reviewPacketBuilder";
+import type { ReviewPacket } from "@/lib/genlayer/types";
 import type { ValidatorPerspective } from "@/components/playground/ValidatorReasoningGrid";
 
 type RunState = "idle" | "running" | "complete";
@@ -44,15 +44,14 @@ export default function PlaygroundPage() {
     ? FRAMEWORKS.find(f => f.frameworkId === sampleCase.frameworkId) ?? FRAMEWORKS[0]
     : FRAMEWORKS[0];
 
-  const packet = sampleCase && framework
-    ? buildReviewPacket(
-        sampleCase,
-        framework,
-        "The respondent failed to deliver the final milestone within the agreed timeline. I provided prompt feedback on all revision requests and the work remains incomplete as per the original brief.",
-        "The scope was changed multiple times during delivery and timeline overruns were caused by client revision cycles, not our delay.",
-        [],
-      )
-    : null;
+  const packet: ReviewPacket | null = sampleCase && framework ? {
+    caseId: sampleCase.caseId, category: sampleCase.category, framework,
+    claimantStatement: "The respondent failed to deliver the final milestone within the agreed timeline.",
+    respondentStatement: "The scope was changed multiple times during delivery.", evidence: [],
+    evidenceCommitment: sampleCase.evidenceRoot ?? "demo", packetCommitment: "demo-packet",
+    proceduralState: { claimHash: sampleCase.claimHash, responseHash: sampleCase.responseHash,
+      evidenceRoot: sampleCase.evidenceRoot },
+  } : null;
 
   function handleRunArbitration() {
     setRunState("running");

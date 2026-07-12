@@ -12,7 +12,8 @@ import EvidenceHashPanel from "@/components/evidence/EvidenceHashPanel";
 import type { EvidenceManifest } from "@/lib/genlayer/types";
 import { useAccount } from "wagmi";
 import { hashString } from "@/lib/utils/hashes";
-import { loadCaseDossier, retainEvidence } from "@/lib/genlayer/caseDossier";
+import { createRetainedEvidence, loadCaseDossier, retainEvidence } from "@/lib/genlayer/caseDossier";
+import { evidenceCommitment } from "@/lib/genlayer/packetCommitments";
 
 export default function EvidencePage() {
   const params = useParams();
@@ -43,14 +44,16 @@ export default function EvidencePage() {
       // Hash the evidence manifest locally — only the hash goes on-chain
       const manifestStr = JSON.stringify({ caseId: caseData.caseId, ...evidenceData });
       const manifestHash = `0x${await hashString(manifestStr)}`;
+      const item = createRetainedEvidence(caseData.caseId, address ?? "unknown", evidenceData);
+      const evidenceRoot = await evidenceCommitment([...loadCaseDossier(caseData.caseId).evidence, item]);
       const txHash = await submitEvidence({
         caseId: caseData.caseId,
         evidenceManifestHash: manifestHash,
-        evidenceRoot: evidenceData.fileHash ?? manifestHash,
+        evidenceRoot,
       });
       setTxStatus("Waiting for validators...");
       await waitForRuling(txHash);
-      retainEvidence(caseData.caseId, address ?? "unknown", evidenceData);
+      retainEvidence(item);
       setTxStatus("Evidence submitted. Refreshing...");
       await refresh();
     } catch (err: unknown) {

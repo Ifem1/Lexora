@@ -4,6 +4,7 @@ import type {
   EvidencePacket,
   ReviewPacket,
 } from "@/lib/genlayer/types";
+import { evidenceCommitment, rulingPacketCommitment } from "./packetCommitments.ts";
 
 /**
  * Build a ReviewPacket to be submitted to the GenLayer AI arbitrator contract.
@@ -11,14 +12,14 @@ import type {
  * The packet is a structured snapshot of the case at the point of requesting a ruling.
  * It includes the framework rules, both parties' statements, and all evidence.
  */
-export function buildReviewPacket(
+export async function buildReviewPacket(
   caseData: ArbitrationCase,
   framework: ArbitrationFramework,
   claimantStatement: string,
   respondentStatement: string,
   evidence: EvidencePacket[],
   proceduralState: Record<string, unknown> = {}
-): ReviewPacket {
+): Promise<ReviewPacket> {
   // Validate required fields
   if (!caseData.caseId) {
     throw new Error("buildReviewPacket: caseData must have a caseId");
@@ -45,6 +46,14 @@ export function buildReviewPacket(
   };
 
   const retainedEvidence = evidence.filter((e) => e.caseId === caseData.caseId);
+  const committedEvidence = await evidenceCommitment(retainedEvidence);
+  if (committedEvidence !== caseData.evidenceRoot) {
+    throw new Error("buildReviewPacket: retained evidence does not match the on-chain evidence root");
+  }
+  const packetCommitment = await rulingPacketCommitment({ caseId: caseData.caseId,
+    frameworkId: framework.frameworkId, claimantStatement: claimantStatement.trim(),
+    respondentStatement: respondentStatement?.trim() ?? "", evidenceCommitment: committedEvidence,
+    claimHash: caseData.claimHash, responseHash: caseData.responseHash, evidenceRoot: caseData.evidenceRoot });
 
   return {
     caseId: caseData.caseId,
@@ -53,6 +62,8 @@ export function buildReviewPacket(
     claimantStatement: claimantStatement.trim(),
     respondentStatement: respondentStatement?.trim() ?? "",
     evidence: retainedEvidence,
+    evidenceCommitment: committedEvidence,
+    packetCommitment,
     proceduralState: enrichedProceduralState,
   };
 }

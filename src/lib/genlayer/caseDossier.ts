@@ -18,8 +18,12 @@ export function retainStatement(caseId: string, party: "claimant" | "respondent"
   save(caseId, { ...loadCaseDossier(caseId), [`${party}Statement`]: statement });
 }
 
-export function retainEvidence(caseId: string, submittedBy: string, data: { evidenceType: string; title: string; summary: string; fileHash?: string; storageUri?: string; sourceUrl?: string; relevanceTag?: string }) {
-  const dossier = loadCaseDossier(caseId);
-  const item: EvidencePacket = { evidenceId: crypto.randomUUID(), caseId, submittedBy, evidenceType: data.evidenceType as EvidenceType, title: data.title, summary: data.summary, fileHash: data.fileHash, storageUri: data.storageUri, sourceUrl: data.sourceUrl, relevanceTag: data.relevanceTag, createdAt: Math.floor(Date.now() / 1000) };
+export function createRetainedEvidence(caseId: string, submittedBy: string, data: { evidenceType: string; title: string; summary: string; fileHash?: string; storageUri?: string; sourceUrl?: string; relevanceTag?: string }): EvidencePacket {
+  return { evidenceId: crypto.randomUUID(), caseId, submittedBy, evidenceType: data.evidenceType as EvidenceType, title: data.title, summary: data.summary, fileHash: data.fileHash, storageUri: data.storageUri, sourceUrl: data.sourceUrl, relevanceTag: data.relevanceTag, createdAt: Math.floor(Date.now() / 1000) };
+}
+
+export function retainEvidence(item: EvidencePacket) {
+  const dossier = loadCaseDossier(item.caseId);
+  const caseId = item.caseId;
   save(caseId, { ...dossier, evidence: [...dossier.evidence, item] });
 }
