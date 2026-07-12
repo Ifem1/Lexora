@@ -3,7 +3,7 @@ import { createClient, chains } from "genlayer-js";
 // ─── Contract Address ─────────────────────────────────────────────────────────
 
 export const CONTRACT_ADDRESS =
-  "0x9Be2516aFDbD102d89D7164187599Aa052E51673" as const;
+  "0x6294fAcFe830177BBfCc4be306146F76d061e603" as const;
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_GENLAYER_RPC_URL ?? "https://studio.genlayer.com/api";
