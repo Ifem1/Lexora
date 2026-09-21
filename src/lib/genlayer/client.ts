@@ -2,8 +2,15 @@ import { createClient, chains } from "genlayer-js";
 
 // ─── Contract Address ─────────────────────────────────────────────────────────
 
-export const CONTRACT_ADDRESS =
-  "0x8cC87a0fC2ffA4E0360F0a5b38B3B0F7a14D3952" as const;
+const configuredContractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+export const CONTRACT_ADDRESS = configuredContractAddress as `0x${string}` | undefined;
+
+function requireContractAddress(): `0x${string}` {
+  if (!CONTRACT_ADDRESS) {
+    throw new Error("NEXT_PUBLIC_CONTRACT_ADDRESS is not configured for the rebuilt Lexora deployment.");
+  }
+  return CONTRACT_ADDRESS;
+}
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_GENLAYER_RPC_URL ?? "https://studio.genlayer.com/api";
@@ -50,7 +57,7 @@ export async function readContract(
   const client = getGenLayerClient();
 
   const result = await client.readContract({
-    address: CONTRACT_ADDRESS,
+    address: requireContractAddress(),
     functionName: method,
     args,
   });
@@ -70,7 +77,8 @@ export async function writeContract(
   method: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any[] = [],
-  provider?: GenLayerWalletProvider
+  provider?: GenLayerWalletProvider,
+  value: bigint = BigInt(0)
 ): Promise<`0x${string}`> {
   // Write calls must be backed by the connected MetaMask GenLayer Snap.
   // Passing only an address to the read-only HTTP client falls back to
@@ -85,10 +93,10 @@ export async function writeContract(
   });
 
   const txHash = await client.writeContract({
-    address: CONTRACT_ADDRESS,
+    address: requireContractAddress(),
     functionName: method,
     args,
-    value: BigInt(0),
+    value,
   });
 
   return txHash as `0x${string}`;
@@ -112,15 +120,21 @@ export async function waitForRuling(txHash: `0x${string}`): Promise<unknown> {
     interval: 5000,
   });
 
-  const leaderReceipt = (receipt as {
+  const normalized = receipt as {
+    status?: string;
+    execution_status?: string;
     consensus_data?: { leader_receipt?: Array<{
       execution_result?: string;
       genvm_result?: { stderr?: string };
     }> };
-  }).consensus_data?.leader_receipt?.[0];
+  };
+  const leaderReceipt = normalized.consensus_data?.leader_receipt?.[0];
   if (leaderReceipt?.execution_result === "ERROR") {
     const detail = leaderReceipt.genvm_result?.stderr?.trim();
     throw new Error(detail || "The contract rejected this transaction.");
+  }
+  if (leaderReceipt?.execution_result && leaderReceipt.execution_result !== "SUCCESS") {
+    throw new Error(`Unexpected GenVM execution result: ${leaderReceipt.execution_result}`);
   }
 
   return receipt;
