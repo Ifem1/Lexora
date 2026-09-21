@@ -7,6 +7,14 @@ the duplicated descriptor. Linux and CI do not need this workaround.
 import os
 
 
+def _sync_direct_datetime(timestamp):
+    try:
+        from genlayer import gl
+        gl.message_raw["datetime"] = timestamp
+    except (ImportError, AttributeError, TypeError):
+        pass
+
+
 def pytest_configure(config):
     original_unlink = os.unlink
 
@@ -25,8 +33,24 @@ def pytest_configure(config):
 
     config._lexora_restore_unlink = restore_unlink
 
+    try:
+        from gltest.direct.vm import VMContext
+        original_warp = VMContext.warp
+
+        def warp_and_sync(self, timestamp):
+            original_warp(self, timestamp)
+            _sync_direct_datetime(timestamp)
+
+        VMContext.warp = warp_and_sync
+        config._lexora_restore_warp = lambda: setattr(VMContext, "warp", original_warp)
+    except ImportError:
+        config._lexora_restore_warp = None
+
 
 def pytest_sessionfinish(session, exitstatus):
     restore = getattr(session.config, "_lexora_restore_unlink", None)
     if restore:
         restore()
+    restore_warp = getattr(session.config, "_lexora_restore_warp", None)
+    if restore_warp:
+        restore_warp()
