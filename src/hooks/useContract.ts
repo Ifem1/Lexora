@@ -347,7 +347,10 @@ export function useContract() {
     return writeContract(addr, "request_ruling", [caseId, reviewPacket], provider);
   }
 
-  async function acceptRuling(): Promise<`0x${string}`> {
+  async function acceptRuling(
+    _caseId?: string,
+    _rulingId?: string
+  ): Promise<`0x${string}`> {
     throw new Error("Direct ruling acceptance is disabled. Use appeal or wait for finalization.");
   }
 
