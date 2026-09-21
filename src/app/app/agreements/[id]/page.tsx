@@ -31,6 +31,7 @@ export default function AgreementRoomPage() {
   const [escrow, setEscrow] = useState<EscrowAccount | null>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [now, setNow] = useState(0);
 
   const refresh = useCallback(async () => {
     const [nextAgreement, nextEscrow] = await Promise.all([
@@ -40,7 +41,11 @@ export default function AgreementRoomPage() {
     setEscrow(nextEscrow);
   }, [agreementId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    void Promise.resolve().then(refresh);
+    const timer = window.setTimeout(() => setNow(Math.floor(Date.now() / 1000)), 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
 
   async function run(label: string, action: () => Promise<`0x${string}`>) {
     setError("");
@@ -70,7 +75,7 @@ export default function AgreementRoomPage() {
   const refundWindowOpen =
     isFunder &&
     !escrow?.activeDisputeId &&
-    Math.floor(Date.now() / 1000) > agreement.disputeDeadlineTs;
+    now > agreement.disputeDeadlineTs;
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
