@@ -25,6 +25,7 @@ export default function AgreementRoomPage() {
   const { address } = useAccount();
   const {
     getAgreement, getEscrow, acceptAgreement, depositEscrow, openDispute,
+    prepareFunderRefund, executeFunderRefund,
   } = useContract();
   const [agreement, setAgreement] = useState<Agreement | null>(null);
   const [escrow, setEscrow] = useState<EscrowAccount | null>(null);
@@ -64,6 +65,12 @@ export default function AgreementRoomPage() {
   const isCounterparty = address?.toLowerCase() === agreement.counterparty.toLowerCase();
   const isFunder = address?.toLowerCase() === agreement.funder.toLowerCase();
   const active = agreement.lifecycleState === "ACTIVE";
+  const availableWei = BigInt(escrow?.availableWei ?? String(escrow?.available ?? 0));
+  const refundableWei = BigInt(escrow?.refundableWei ?? String(escrow?.refundable ?? 0));
+  const refundWindowOpen =
+    isFunder &&
+    !escrow?.activeDisputeId &&
+    Math.floor(Date.now() / 1000) > agreement.disputeDeadlineTs;
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
@@ -135,6 +142,30 @@ export default function AgreementRoomPage() {
           <button type="submit" disabled={Boolean(escrow?.activeDisputeId)}>Open dispute and reserve escrow</button>
           {escrow?.activeDisputeId && <p>Unresolved dispute: <a href={`/app/cases/${escrow.activeDisputeId}`}>{escrow.activeDisputeId}</a></p>}
         </form>
+      )}
+
+      {refundWindowOpen && availableWei > 0n && (
+        <section style={{ marginTop: 28 }}>
+          <h2>Close unused escrow for refund</h2>
+          <p>The dispute window has expired and no unresolved dispute controls these funds.</p>
+          <button onClick={() => run("prepare refund", () => prepareFunderRefund(agreement.agreementId))}>
+            Move AVAILABLE → REFUNDABLE
+          </button>
+        </section>
+      )}
+
+      {isFunder && refundableWei > 0n && (
+        <section style={{ marginTop: 18 }}>
+          <h2>Refundable escrow</h2>
+          <p>{escrow?.refundableWei ?? String(escrow?.refundable ?? 0)} wei is refundable to the designated funder.</p>
+          {!escrow?.refundTransferPending ? (
+            <button onClick={() => run("emit refund transfer", () => executeFunderRefund(agreement.agreementId))}>
+              Schedule finalization-bound GEN refund
+            </button>
+          ) : (
+            <p>Refund transfer message emitted; REFUNDED remains unconfirmed until the live completion path is verified.</p>
+          )}
+        </section>
       )}
 
       {status && <p style={{ marginTop: 20 }}>Transaction: <strong>{status}</strong></p>}
