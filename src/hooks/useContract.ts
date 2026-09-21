@@ -11,6 +11,7 @@ import type {
   Agreement,
   EscrowAccount,
   SettlementRecord,
+  EvidencePacket,
 } from "@/lib/genlayer/types";
 
 // ─── Protocol Stats Type ──────────────────────────────────────────────────────
@@ -80,6 +81,17 @@ export function useContract() {
     } catch (err) {
       console.error("[useContract] getSettlement failed:", err);
       return null;
+    }
+  }
+
+  async function getCaseEvidence(caseId: string, appeal = false): Promise<EvidencePacket[]> {
+    try {
+      const raw = await readContract("get_case_evidence", [caseId, appeal]);
+      const parsed = raw ? parseJsonResult<EvidencePacket[]>(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error("[useContract] getCaseEvidence failed:", err);
+      return [];
     }
   }
 
@@ -410,6 +422,7 @@ export function useContract() {
     getAgreement,
     getEscrow,
     getSettlement,
+    getCaseEvidence,
     getCase,
     getRuling,
     getPartyCases,
