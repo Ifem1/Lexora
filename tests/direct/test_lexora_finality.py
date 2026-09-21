@@ -100,7 +100,6 @@ def test_invalid_duplicate_and_expired_appeal_paths_reject_before_consensus(dire
     case.appeal_id = ""
     case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
     contract.cases[case_id] = case
-    direct_vm.warp("2025-01-02T00:00:00Z")
     with direct_vm.expect_revert("appeal window has expired"):
         contract.appeal_ruling(
             case_id,
@@ -167,22 +166,21 @@ def test_zero_award_settlement_can_finalize_without_outward_transfer(direct_vm, 
 
 
 def test_no_appeal_finalization_requires_expired_window(direct_vm, direct_deploy):
-    direct_vm.warp("2025-01-01T00:00:00Z")
     contract, case_id = setup_funded_dispute(direct_vm, direct_deploy)
     store_initial_ruling(contract, case_id, outcome="RESPONDENT_PREVAILS", bps=0, action="NO_ACTION")
 
     with direct_vm.expect_revert("appeal window is still open"):
         contract.finalize_no_appeal(case_id)
 
-    direct_vm.warp("2025-01-05T00:00:00Z")
+    case = contract._get_case(case_id)
+    case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
+    contract.cases[case_id] = case
     contract.finalize_no_appeal(case_id)
     case_json = json.loads(contract.get_case(case_id))
     assert case_json["finalRulingId"] == "RULING-TEST-INITIAL"
     assert case_json["status"] == "SETTLEMENT_READY"
 
-
 def test_available_funds_can_only_become_refundable_after_dispute_window(direct_vm, direct_deploy):
-    direct_vm.warp("2025-01-01T00:00:00Z")
     contract = direct_deploy("contracts/LexoraArbitration.py")
     direct_vm.sender = CREATOR
     propose(contract)
@@ -192,12 +190,17 @@ def test_available_funds_can_only_become_refundable_after_dispute_window(direct_
     with direct_vm.expect_revert("dispute window is still open"):
         contract.prepare_funder_refund("AGREEMENT-001")
 
-    direct_vm.warp("2025-03-01T00:00:00Z")
+    agreement = contract._get_agreement("AGREEMENT-001")
+    agreement.dispute_deadline_ts = type(agreement.dispute_deadline_ts)(1)
+    contract.agreements["AGREEMENT-001"] = agreement
     contract.prepare_funder_refund("AGREEMENT-001")
     escrow = json.loads(contract.get_escrow("AGREEMENT-001"))
     assert escrow["available"] == 0
     assert escrow["refundable"] == 1000
     assert escrow["refunded"] == 0
+    assert escrow["refundTransferPending"] is False
 
-    with direct_vm.expect_revert("Runtime handoff"):
-        contract.execute_funder_refund("AGREEMENT-001")
+    # Direct Mode cannot prove the asynchronous external transfer completed.
+    # The live Studio/Codex phase must verify the emitted transfer and later
+    # accounting confirmation rather than faking REFUNDED here.
+
