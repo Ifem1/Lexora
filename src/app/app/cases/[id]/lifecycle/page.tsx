@@ -181,12 +181,12 @@ export default function CaseLifecyclePage() {
           <div>Recipient: {settlement.recipient || "none"}</div>
           <div>Award: {settlement.awardAmountWei ?? String(settlement.awardAmount)} wei</div>
           <div>Unused reservation released: {settlement.releasedAmountWei ?? String(settlement.releasedAmount)} wei</div>
-          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) === 0n && settlement.state === "READY" && (
+          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) === BigInt(0) && settlement.state === "READY" && (
             <button onClick={() => run("settle zero award", () => finalizeZeroAwardSettlement(caseId))} style={{ marginTop: 12 }}>
               Finalize zero-award settlement
             </button>
           )}
-          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) > 0n && settlement.state === "READY" && (
+          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) > BigInt(0) && settlement.state === "READY" && (
             <div style={{ marginTop: 12 }}>
               <button onClick={() => run("emit payout transfer", () => executeClaimablePayout(caseId))}>
                 Schedule finalization-bound GEN payout
