@@ -201,5 +201,7 @@ def test_available_funds_can_only_become_refundable_after_dispute_window(direct_
     assert escrow["refundable"] == 1000
     assert escrow["refunded"] == 0
 
-    with pytest.raises(Exception, match="Runtime handoff"):
+    # Direct Mode proves the accounting transition and must not fake a native
+    # balance. The actual external refund requires a funded contract balance.
+    with pytest.raises(Exception, match="Contract GEN balance is insufficient for refund"):
         contract.execute_funder_refund("AGREEMENT-001")
