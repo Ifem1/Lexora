@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useContract } from "@/hooks/useContract";
 import { motion } from "framer-motion";
 import { StatSkeleton } from "@/components/ui/Skeleton";
@@ -14,11 +14,9 @@ const fadeUp = {
 
 function AnimatedNumber({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
-  const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    if (started || value === 0) { setDisplay(value); return; }
-    setStarted(true);
+    if (value === 0) return;
     const duration = 1000;
     const start = Date.now();
     const tick = () => {
@@ -27,8 +25,9 @@ function AnimatedNumber({ value }: { value: number }) {
       setDisplay(Math.round(eased * value));
       if (progress < 1) requestAnimationFrame(tick);
     };
-    tick();
-  }, [value, started]);
+    const frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
 
   return <span>{display}</span>;
 }
@@ -53,12 +52,12 @@ function StatCard({ label, value, delay = 0 }: { label: string; value: number; d
 export default function AuditPage() {
   const { getProtocolStats } = useContract();
   const [stats, setStats] = useState<ProtocolStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [caseIdLookup, setCaseIdLookup] = useState("");
 
   useEffect(() => {
-    setStatsLoading(true);
-    getProtocolStats()
+    void Promise.resolve()
+      .then(getProtocolStats)
       .then(setStats)
       .catch(console.error)
       .finally(() => setStatsLoading(false));
