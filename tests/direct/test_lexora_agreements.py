@@ -59,6 +59,7 @@ def open_dispute(contract, direct_vm, agreement_id="AGREEMENT-001"):
 
 def test_proposal_acceptance_and_pickling(direct_vm, direct_deploy):
     direct_vm.check_pickling = True
+    direct_vm.warp("2025-01-01T00:00:00Z")
     contract = direct_deploy("contracts/LexoraArbitration.py")
     direct_vm.sender = CREATOR
 
@@ -66,13 +67,12 @@ def test_proposal_acceptance_and_pickling(direct_vm, direct_deploy):
     agreement = json.loads(contract.get_agreement("AGREEMENT-001"))
     assert agreement["lifecycleState"] == "PROPOSED"
     assert agreement["funder"] == CREATOR
-    assert agreement["proposedAt"] > 0
-    assert agreement["acceptanceDeadlineTs"] - agreement["proposedAt"] == 7 * 86400
+    assert agreement["proposedAt"] == 1735689600
 
     accept(contract, direct_vm)
     accepted = json.loads(contract.get_agreement("AGREEMENT-001"))
     assert accepted["lifecycleState"] == "ACCEPTED_PENDING_FUNDING"
-    assert accepted["acceptedAt"] >= accepted["proposedAt"]
+    assert accepted["acceptedAt"] == 1735689600
     assert contract.get_funding_state("AGREEMENT-001") == "UNFUNDED"
 
 
@@ -83,18 +83,18 @@ def test_invalid_acceptance_cancellation_and_mutation_rejected(direct_vm, direct
     agreement = json.loads(contract.get_agreement("AGREEMENT-001"))
 
     direct_vm.sender = UNRELATED
-    with pytest.raises(AssertionError, match="Only the counterparty may accept"):
+    with direct_vm.expect_revert("Only the counterparty may accept"):
         contract.accept_agreement("AGREEMENT-001", 1, agreement["commitment"])
 
     direct_vm.sender = COUNTERPARTY
-    with pytest.raises(AssertionError, match="Agreement commitment mismatch"):
+    with direct_vm.expect_revert("Agreement commitment mismatch"):
         contract.accept_agreement("AGREEMENT-001", 1, "0xwrong")
     contract.accept_agreement("AGREEMENT-001", 1, agreement["commitment"])
-    with pytest.raises(AssertionError, match="Agreement is not proposed"):
+    with direct_vm.expect_revert("Agreement is not proposed"):
         contract.accept_agreement("AGREEMENT-001", 1, agreement["commitment"])
 
     direct_vm.sender = CREATOR
-    with pytest.raises(AssertionError, match="Accepted agreements cannot be cancelled"):
+    with direct_vm.expect_revert("Accepted agreements cannot be cancelled"):
         contract.cancel_agreement("AGREEMENT-001")
 
 
@@ -102,14 +102,14 @@ def test_duplicate_parties_ids_and_unsafe_remedy_sets_rejected(direct_vm, direct
     contract = direct_deploy("contracts/LexoraArbitration.py")
     direct_vm.sender = CREATOR
 
-    with pytest.raises(AssertionError, match="Creator and counterparty cannot be identical"):
+    with direct_vm.expect_revert("Creator and counterparty cannot be identical"):
         contract.propose_agreement(
             "AGREEMENT-X", CREATOR, CREATOR, "private_agreement_breach", "v1",
             "Test agreement", "0xdesc", "0xobligations", "0xcriteria", "0xevidence",
             json.dumps(["PAY", "NO_ACTION"]), 1000, 1000, 7, 30, 45,
         )
 
-    with pytest.raises(AssertionError, match="NO_ACTION must remain permitted"):
+    with direct_vm.expect_revert("NO_ACTION must remain permitted"):
         contract.propose_agreement(
             "AGREEMENT-NO-FALLBACK", COUNTERPARTY, CREATOR,
             "private_agreement_breach", "v1", "Test agreement",
@@ -118,26 +118,24 @@ def test_duplicate_parties_ids_and_unsafe_remedy_sets_rejected(direct_vm, direct
         )
 
     propose(contract)
-    with pytest.raises(AssertionError, match="Agreement ID already exists"):
+    with direct_vm.expect_revert("Agreement ID already exists"):
         propose(contract)
 
 
 def test_acceptance_deadline_uses_transaction_time(direct_vm, direct_deploy):
+    direct_vm.warp("2025-01-01T00:00:00Z")
     contract = direct_deploy("contracts/LexoraArbitration.py")
     direct_vm.sender = CREATOR
     propose(contract, "AGREEMENT-TIME")
-    agreement_json = json.loads(contract.get_agreement("AGREEMENT-TIME"))
-    assert agreement_json["acceptanceDeadlineTs"] - agreement_json["proposedAt"] == 7 * 86400
+    agreement = json.loads(contract.get_agreement("AGREEMENT-TIME"))
+    assert agreement["proposedAt"] == 1735689600
+    assert agreement["acceptanceDeadlineTs"] == 1736294400
 
-    # Direct Mode 0.29.2 does not apply direct_vm.warp() to GenVM's documented
-    # standard-library transaction clock. Set only the stored boundary so the
-    # acceptance-expiry guard itself remains covered deterministically.
-    stored = contract._get_agreement("AGREEMENT-TIME")
-    stored.acceptance_deadline_ts = type(stored.acceptance_deadline_ts)(1)
-    contract.agreements["AGREEMENT-TIME"] = stored
+    direct_vm.warp("2025-01-09T00:00:00Z")
     direct_vm.sender = COUNTERPARTY
-    with pytest.raises(AssertionError, match="acceptance window has expired"):
-        contract.accept_agreement("AGREEMENT-TIME", 1, agreement_json["commitment"])
+    with direct_vm.expect_revert("acceptance window has expired"):
+        contract.accept_agreement("AGREEMENT-TIME", 1, agreement["commitment"])
+
 
 def test_real_payable_escrow_zero_topup_overfunding_and_conservation(direct_vm, direct_deploy):
     contract = direct_deploy("contracts/LexoraArbitration.py")
@@ -147,12 +145,12 @@ def test_real_payable_escrow_zero_topup_overfunding_and_conservation(direct_vm, 
 
     direct_vm.sender = CREATOR
     direct_vm.value = 0
-    with pytest.raises(AssertionError, match="must include native GEN value"):
+    with direct_vm.expect_revert("must include native GEN value"):
         contract.deposit_escrow("AGREEMENT-001")
 
     direct_vm.sender = UNRELATED
     direct_vm.value = 100
-    with pytest.raises(AssertionError, match="Only the designated funder"):
+    with direct_vm.expect_revert("Only the designated funder"):
         contract.deposit_escrow("AGREEMENT-001")
     direct_vm.value = 0
 
@@ -165,7 +163,7 @@ def test_real_payable_escrow_zero_topup_overfunding_and_conservation(direct_vm, 
 
     direct_vm.sender = CREATOR
     direct_vm.value = 601
-    with pytest.raises(AssertionError, match="exceeds required funding"):
+    with direct_vm.expect_revert("exceeds required funding"):
         contract.deposit_escrow("AGREEMENT-001")
     direct_vm.value = 0
 
@@ -192,13 +190,13 @@ def test_dispute_requires_active_agreement_derives_parties_and_reserves_once(dir
     accept(contract, direct_vm)
 
     direct_vm.sender = CREATOR
-    with pytest.raises(AssertionError, match="ACTIVE funded agreement"):
+    with direct_vm.expect_revert("ACTIVE funded agreement"):
         open_dispute(contract, direct_vm)
 
     fund(contract, direct_vm, 1000)
 
     direct_vm.sender = UNRELATED
-    with pytest.raises(AssertionError, match="accepted agreement party"):
+    with direct_vm.expect_revert("accepted agreement party"):
         contract.open_dispute(
             "AGREEMENT-001", "0xmanifest", "Invalid outsider dispute",
             "AGREEMENT_DISPUTE", 7, False,
@@ -216,10 +214,10 @@ def test_dispute_requires_active_agreement_derives_parties_and_reserves_once(dir
     assert escrow["reserved"] == 1000
     assert escrow["activeDisputeId"] == case_id
 
-    with pytest.raises(AssertionError, match="Only one unresolved monetary dispute"):
+    with direct_vm.expect_revert("Only one unresolved monetary dispute"):
         open_dispute(contract, direct_vm)
 
-    with pytest.raises(AssertionError, match="Legacy create_case is disabled"):
+    with direct_vm.expect_revert("Legacy create_case is disabled"):
         contract.create_case(
             "private_agreement_breach", "0xlegacy", "Legacy bypass",
             "AGREEMENT_DISPUTE", COUNTERPARTY, 7, False,
@@ -242,14 +240,14 @@ def test_evidence_is_append_only_deduplicated_and_locked(direct_vm, direct_deplo
     )
     assert evidence_id.startswith("EVIDENCE-")
 
-    with pytest.raises(AssertionError, match="Duplicate evidence commitment"):
+    with direct_vm.expect_revert("Duplicate evidence commitment"):
         contract.submit_evidence_record(
             case_id, "CLAIMANT_EVIDENCE", "CONTRACT", "",
             "Duplicate", "0xev-1",
         )
 
     direct_vm.sender = COUNTERPARTY
-    with pytest.raises(AssertionError, match="Only the claimant may submit claimant evidence"):
+    with direct_vm.expect_revert("Only the claimant may submit claimant evidence"):
         contract.submit_evidence_record(
             case_id, "CLAIMANT_EVIDENCE", "CONTRACT", "",
             "Wrong role", "0xev-2",
@@ -265,12 +263,12 @@ def test_evidence_is_append_only_deduplicated_and_locked(direct_vm, direct_deplo
     assert locked["evidenceState"] == "EVIDENCE_LOCKED"
     assert locked["evidenceRoot"].startswith("0x")
 
-    with pytest.raises(AssertionError, match="Original evidence is locked"):
+    with direct_vm.expect_revert("Original evidence is locked"):
         contract.submit_evidence_record(
             case_id, "COUNTER_EVIDENCE", "OTHER", "",
             "Late original evidence", "0xev-4",
         )
-    with pytest.raises(AssertionError, match="Replaceable evidence roots are disabled"):
+    with direct_vm.expect_revert("Replaceable evidence roots are disabled"):
         contract.submit_evidence(case_id, "0xmanifest", "0xroot")
 
 
@@ -312,7 +310,7 @@ def test_ruling_economic_fields_are_deterministically_bounded(direct_vm, direct_
     assert int(no_award.liability_bps) == 0
     assert int(no_award.bounded_award) == 0
 
-    with pytest.raises(AssertionError, match="not permitted by the accepted agreement"):
+    with direct_vm.expect_revert("not permitted by the accepted agreement"):
         contract._parse_ruling(
             json.dumps({
                 "outcome": "CLAIMANT_PREVAILS",
@@ -344,7 +342,7 @@ def test_cancel_releases_reservation_and_prevents_double_spend(direct_vm, direct
 
 def test_legacy_economic_bypasses_are_disabled(direct_vm, direct_deploy):
     contract = direct_deploy("contracts/LexoraArbitration.py")
-    with pytest.raises(AssertionError, match="accept_ruling cannot bypass"):
+    with direct_vm.expect_revert("accept_ruling cannot bypass"):
         contract.accept_ruling("CASE-X", "RULING-X")
-    with pytest.raises(AssertionError, match="mark_settled is disabled"):
+    with direct_vm.expect_revert("mark_settled is disabled"):
         contract.mark_settled("CASE-X")

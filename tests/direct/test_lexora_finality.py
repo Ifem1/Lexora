@@ -1,7 +1,5 @@
 import json
 
-import pytest
-
 from test_lexora_agreements import (
     CREATOR,
     COUNTERPARTY,
@@ -84,7 +82,7 @@ def test_invalid_duplicate_and_expired_appeal_paths_reject_before_consensus(dire
     store_initial_ruling(contract, case_id)
     direct_vm.sender = CREATOR
 
-    with pytest.raises(AssertionError, match="Invalid appeal ground"):
+    with direct_vm.expect_revert("Invalid appeal ground"):
         contract.appeal_ruling(
             case_id,
             json.dumps({"appealGround": "ANYTHING_I_WANT", "appealStatement": "invalid"}),
@@ -93,7 +91,7 @@ def test_invalid_duplicate_and_expired_appeal_paths_reject_before_consensus(dire
     case = contract._get_case(case_id)
     case.appeal_id = "RULING-ALREADY-APPEALED"
     contract.cases[case_id] = case
-    with pytest.raises(AssertionError, match="Only one application-level appeal"):
+    with direct_vm.expect_revert("Only one application-level appeal"):
         contract.appeal_ruling(
             case_id,
             json.dumps({"appealGround": "PROCEDURAL_ERROR", "appealStatement": "second appeal"}),
@@ -102,7 +100,8 @@ def test_invalid_duplicate_and_expired_appeal_paths_reject_before_consensus(dire
     case.appeal_id = ""
     case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
     contract.cases[case_id] = case
-    with pytest.raises(AssertionError, match="appeal window has expired"):
+    direct_vm.warp("2025-01-02T00:00:00Z")
+    with direct_vm.expect_revert("appeal window has expired"):
         contract.appeal_ruling(
             case_id,
             json.dumps({"appealGround": "PROCEDURAL_ERROR", "appealStatement": "too late"}),
@@ -111,13 +110,14 @@ def test_invalid_duplicate_and_expired_appeal_paths_reject_before_consensus(dire
 
 def test_settlement_moves_reserved_to_claimable_and_releases_unused(direct_vm, direct_deploy):
     contract, case_id = setup_funded_dispute(direct_vm, direct_deploy)
-    store_initial_ruling(contract, case_id, bps=6000)
+    ruling_id = store_initial_ruling(contract, case_id, bps=6000)
 
     case = contract._get_case(case_id)
-    case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
+    case.final_ruling_id = ruling_id
+    case.status = "FINAL_RULING"
     contract.cases[case_id] = case
-    contract.finalize_no_appeal(case_id)
 
+    contract._prepare_settlement(case_id)
     escrow = json.loads(contract.get_escrow("AGREEMENT-001"))
     settlement = json.loads(contract.get_settlement(case_id))
     case_json = json.loads(contract.get_case(case_id))
@@ -134,25 +134,27 @@ def test_settlement_moves_reserved_to_claimable_and_releases_unused(direct_vm, d
         == escrow["totalDeposited"]
     )
 
-    with pytest.raises(AssertionError, match="Settlement has already been prepared"):
+    with direct_vm.expect_revert("Settlement has already been prepared"):
         contract._prepare_settlement(case_id)
 
-    with pytest.raises(AssertionError, match="actual GEN transfer"):
+    with direct_vm.expect_revert("actual GEN transfer"):
         contract.finalize_zero_award_settlement(case_id)
+
 
 def test_zero_award_settlement_can_finalize_without_outward_transfer(direct_vm, direct_deploy):
     contract, case_id = setup_funded_dispute(direct_vm, direct_deploy)
-    store_initial_ruling(
+    ruling_id = store_initial_ruling(
         contract, case_id,
         outcome="RESPONDENT_PREVAILS",
         bps=10000,
         action="NO_ACTION",
     )
     case = contract._get_case(case_id)
-    case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
+    case.final_ruling_id = ruling_id
+    case.status = "FINAL_RULING"
     contract.cases[case_id] = case
-    contract.finalize_no_appeal(case_id)
 
+    contract._prepare_settlement(case_id)
     settlement = json.loads(contract.get_settlement(case_id))
     assert settlement["awardAmount"] == 0
 
@@ -163,41 +165,39 @@ def test_zero_award_settlement_can_finalize_without_outward_transfer(direct_vm, 
     assert case_json["settlementState"] == "SETTLED"
     assert escrow["activeDisputeId"] == ""
 
+
 def test_no_appeal_finalization_requires_expired_window(direct_vm, direct_deploy):
+    direct_vm.warp("2025-01-01T00:00:00Z")
     contract, case_id = setup_funded_dispute(direct_vm, direct_deploy)
     store_initial_ruling(contract, case_id, outcome="RESPONDENT_PREVAILS", bps=0, action="NO_ACTION")
 
-    with pytest.raises(AssertionError, match="appeal window is still open"):
+    with direct_vm.expect_revert("appeal window is still open"):
         contract.finalize_no_appeal(case_id)
 
-    case = contract._get_case(case_id)
-    case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
-    contract.cases[case_id] = case
+    direct_vm.warp("2025-01-05T00:00:00Z")
     contract.finalize_no_appeal(case_id)
     case_json = json.loads(contract.get_case(case_id))
     assert case_json["finalRulingId"] == "RULING-TEST-INITIAL"
     assert case_json["status"] == "SETTLEMENT_READY"
 
+
 def test_available_funds_can_only_become_refundable_after_dispute_window(direct_vm, direct_deploy):
+    direct_vm.warp("2025-01-01T00:00:00Z")
     contract = direct_deploy("contracts/LexoraArbitration.py")
     direct_vm.sender = CREATOR
     propose(contract)
     accept(contract, direct_vm)
     fund(contract, direct_vm, 1000)
 
-    with pytest.raises(AssertionError, match="dispute window is still open"):
+    with direct_vm.expect_revert("dispute window is still open"):
         contract.prepare_funder_refund("AGREEMENT-001")
 
-    agreement = contract._get_agreement("AGREEMENT-001")
-    agreement.dispute_deadline_ts = type(agreement.dispute_deadline_ts)(1)
-    contract.agreements["AGREEMENT-001"] = agreement
+    direct_vm.warp("2025-03-01T00:00:00Z")
     contract.prepare_funder_refund("AGREEMENT-001")
     escrow = json.loads(contract.get_escrow("AGREEMENT-001"))
     assert escrow["available"] == 0
     assert escrow["refundable"] == 1000
     assert escrow["refunded"] == 0
-    assert escrow["refundTransferPending"] is False
 
-    # The outward REFUNDABLE -> transferred/refunded confirmation remains a
-    # Studio/runtime verification step; Direct Mode must not fake that success.
-
+    with direct_vm.expect_revert("Runtime handoff"):
+        contract.execute_funder_refund("AGREEMENT-001")

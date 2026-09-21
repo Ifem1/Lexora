@@ -5,7 +5,7 @@ from genlayer import *
 from dataclasses import dataclass
 import json
 import hashlib
-import time
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 
@@ -507,25 +507,33 @@ class LexoraArbitration(gl.Contract):
         )
 
     def _get_case(self, case_id: str) -> ArbitrationCase:
-        assert case_id in self.cases, f"Case not found: {case_id}"
+        self._require(case_id in self.cases, f"Case not found: {case_id}")
         return self.cases[case_id]
 
     def _get_ruling(self, ruling_id: str) -> ArbitrationRuling:
-        assert ruling_id in self.rulings, f"Ruling not found: {ruling_id}"
+        self._require(ruling_id in self.rulings, f"Ruling not found: {ruling_id}")
         return self.rulings[ruling_id]
 
     def _get_agreement(self, agreement_id: str) -> Agreement:
-        assert agreement_id in self.agreements, f"Agreement not found: {agreement_id}"
+        self._require(agreement_id in self.agreements, f"Agreement not found: {agreement_id}")
         return self.agreements[agreement_id]
 
     def _get_escrow(self, agreement_id: str) -> EscrowAccount:
-        assert agreement_id in self.escrows, f"Escrow not found: {agreement_id}"
+        self._require(agreement_id in self.escrows, f"Escrow not found: {agreement_id}")
         return self.escrows[agreement_id]
 
     def _agreement_now(self) -> u256:
-        # GenVM's standard-library clock is deterministically pinned to the
-        # transaction timestamp for every validator execution.
-        return u256(int(time.time()))
+        # GenVM supplies this timestamp as part of deterministic transaction
+        # context; validators therefore agree on the exact same instant.
+        raw = str(gl.message_raw["datetime"])
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return u256(int(parsed.timestamp()))
+
+    def _require(self, condition: bool, message: str) -> None:
+        if not condition:
+            raise gl.vm.UserError(message)
 
     def _assert_escrow_conservation(self, escrow: EscrowAccount) -> None:
         accounted = (
@@ -533,7 +541,7 @@ class LexoraArbitration(gl.Contract):
             + int(escrow.claimable) + int(escrow.refundable)
             + int(escrow.paid) + int(escrow.refunded)
         )
-        assert int(escrow.total_deposited) == accounted, "Escrow conservation invariant failed."
+        self._require(int(escrow.total_deposited) == accounted, "Escrow conservation invariant failed.")
 
     def _set_case_index(self, index: TreeMap[str, str], case_id: str, evidence_id: str) -> None:
         ids = json.loads(index[case_id]) if case_id in index else []
@@ -564,10 +572,10 @@ class LexoraArbitration(gl.Contract):
     def _validate_public_url(self, url: str) -> None:
         parsed = urlparse(url)
         host = (parsed.hostname or "").lower()
-        assert parsed.scheme == "https" and host, "Public web evidence must use a valid HTTPS URL."
-        assert host not in ("localhost", "localhost.localdomain") and not host.endswith(".local"), "Local web sources are not allowed."
-        assert not (host.startswith("127.") or host.startswith("10.") or host.startswith("192.168.") or host.startswith("169.254.")), "Private network web sources are not allowed."
-        assert not host.startswith("172.") and host not in ("0.0.0.0", "::1"), "Private network web sources are not allowed."
+        self._require(parsed.scheme == "https" and host, "Public web evidence must use a valid HTTPS URL.")
+        self._require(host not in ("localhost", "localhost.localdomain") and not host.endswith(".local"), "Local web sources are not allowed.")
+        self._require(not (host.startswith("127.") or host.startswith("10.") or host.startswith("192.168.") or host.startswith("169.254.")), "Private network web sources are not allowed.")
+        self._require(not host.startswith("172.") and host not in ("0.0.0.0", "::1"), "Private network web sources are not allowed.")
 
     def _allowed_agreement_remedies(self, agreement: Agreement) -> list:
         remedies = json.loads(agreement.permitted_remedies_json)
@@ -579,9 +587,9 @@ class LexoraArbitration(gl.Contract):
         agreement = self._get_agreement(case.agreement_id)
         escrow = self._get_escrow(case.agreement_id)
         allowed = self._allowed_agreement_remedies(agreement)
-        assert action in allowed, "Ruling remedy is not permitted by the accepted agreement."
+        self._require(action in allowed, "Ruling remedy is not permitted by the accepted agreement.")
         framework_allowed = self._rulebook(agreement.framework_id).get("remedy_options", [])
-        assert action in framework_allowed, "Ruling remedy is outside the selected framework."
+        self._require(action in framework_allowed, "Ruling remedy is outside the selected framework.")
 
         bps = max(0, min(10000, int(requested_bps)))
         if outcome in ("RESPONDENT_PREVAILS", "INSUFFICIENT_EVIDENCE", "PROCEDURAL_FAILURE"):
@@ -601,7 +609,7 @@ class LexoraArbitration(gl.Contract):
     def _release_case_reservation(self, case: ArbitrationCase) -> None:
         escrow = self._get_escrow(case.agreement_id)
         amount = int(case.reserved_amount)
-        assert int(escrow.reserved) >= amount, "Escrow reservation underflow."
+        self._require(int(escrow.reserved) >= amount, "Escrow reservation underflow.")
         escrow.reserved = u256(int(escrow.reserved) - amount)
         escrow.available = u256(int(escrow.available) + amount)
         escrow.active_dispute_id = ""
@@ -610,15 +618,15 @@ class LexoraArbitration(gl.Contract):
 
     def _prepare_settlement(self, case_id: str) -> None:
         case = self._get_case(case_id)
-        assert case.settlement_state == "NONE", "Settlement has already been prepared."
-        assert case.status == "FINAL_RULING", "A final ruling is required before settlement preparation."
-        assert len(case.final_ruling_id) > 0, "Final ruling ID is missing."
+        self._require(case.settlement_state == "NONE", "Settlement has already been prepared.")
+        self._require(case.status == "FINAL_RULING", "A final ruling is required before settlement preparation.")
+        self._require(len(case.final_ruling_id) > 0, "Final ruling ID is missing.")
 
         ruling = self._get_ruling(case.final_ruling_id)
         agreement = self._get_agreement(case.agreement_id)
         escrow = self._get_escrow(case.agreement_id)
         reserved = int(case.reserved_amount)
-        assert int(escrow.reserved) >= reserved, "Escrow reservation underflow."
+        self._require(int(escrow.reserved) >= reserved, "Escrow reservation underflow.")
 
         award = min(int(ruling.bounded_award), reserved, int(agreement.maximum_exposure))
         unused = reserved - award
@@ -660,18 +668,21 @@ class LexoraArbitration(gl.Contract):
         self.party_cases[address] = json.dumps(ids)
 
     def _check_outcome(self, outcome: str) -> None:
-        assert outcome in VALID_OUTCOMES, (
-            f"Invalid outcome '{outcome}'. Allowed: {VALID_OUTCOMES}"
+        self._require(
+            outcome in VALID_OUTCOMES,
+            f"Invalid outcome '{outcome}'. Allowed: {VALID_OUTCOMES}",
         )
 
     def _check_remedy(self, action: str) -> None:
-        assert action in VALID_REMEDY_ACTIONS, (
-            f"Invalid remedy action '{action}'. Allowed: {VALID_REMEDY_ACTIONS}"
+        self._require(
+            action in VALID_REMEDY_ACTIONS,
+            f"Invalid remedy action '{action}'. Allowed: {VALID_REMEDY_ACTIONS}",
         )
 
     def _check_appeal_outcome(self, outcome: str) -> None:
-        assert outcome in VALID_APPEAL_OUTCOMES, (
-            f"Invalid appeal outcome '{outcome}'. Allowed: {VALID_APPEAL_OUTCOMES}"
+        self._require(
+            outcome in VALID_APPEAL_OUTCOMES,
+            f"Invalid appeal outcome '{outcome}'. Allowed: {VALID_APPEAL_OUTCOMES}",
         )
 
     def _check_framework(self, framework_id: str) -> None:
@@ -715,12 +726,12 @@ class LexoraArbitration(gl.Contract):
                 continue
             parsed = urlparse(url)
             host = (parsed.hostname or "").lower()
-            assert parsed.scheme == "https" and host, "Evidence web sources must use HTTPS."
-            assert host not in ("localhost", "localhost.localdomain") and not host.endswith(".local"), "Local web sources are not allowed."
-            assert not (host.startswith("127.") or host.startswith("10.") or host.startswith("192.168.") or host.startswith("169.254.")), "Private network web sources are not allowed."
-            assert not host.startswith("172.") and host not in ("0.0.0.0", "::1"), "Private network web sources are not allowed."
+            self._require(parsed.scheme == "https" and host, "Evidence web sources must use HTTPS.")
+            self._require(host not in ("localhost", "localhost.localdomain") and not host.endswith(".local"), "Local web sources are not allowed.")
+            self._require(not (host.startswith("127.") or host.startswith("10.") or host.startswith("192.168.") or host.startswith("169.254.")), "Private network web sources are not allowed.")
+            self._require(not host.startswith("172.") and host not in ("0.0.0.0", "::1"), "Private network web sources are not allowed.")
             urls.append(url)
-            assert len(urls) <= 5, "A ruling packet may contain at most 5 web sources."
+            self._require(len(urls) <= 5, "A ruling packet may contain at most 5 web sources.")
         return urls
 
     # ── Prompt Builders ────────────────────────────────────────────────────────
@@ -1115,27 +1126,27 @@ class LexoraArbitration(gl.Contract):
         """Publish one immutable bilateral agreement version before any dispute exists."""
         creator = str(gl.message.sender_address)
         zero = "0x0000000000000000000000000000000000000000"
-        assert creator.lower() != zero, "Creator cannot be the zero address."
-        assert counterparty.lower() != zero, "Counterparty cannot be the zero address."
-        assert creator.lower() != counterparty.lower(), "Creator and counterparty cannot be identical."
-        assert funder.lower() in (creator.lower(), counterparty.lower()), "Funder must be the creator or counterparty."
-        assert agreement_id not in self.agreements, "Agreement ID already exists."
+        self._require(creator.lower() != zero, "Creator cannot be the zero address.")
+        self._require(counterparty.lower() != zero, "Counterparty cannot be the zero address.")
+        self._require(creator.lower() != counterparty.lower(), "Creator and counterparty cannot be identical.")
+        self._require(funder.lower() in (creator.lower(), counterparty.lower()), "Funder must be the creator or counterparty.")
+        self._require(agreement_id not in self.agreements, "Agreement ID already exists.")
         self._check_framework(framework_id)
-        assert len(framework_version) > 0, "Framework version is required."
-        assert len(title) >= 1, "Agreement title is required."
-        assert len(description_commitment) > 0, "Description commitment is required."
-        assert len(obligation_commitment) > 0, "Obligation commitment is required."
-        assert len(acceptance_criteria_commitment) > 0, "Acceptance criteria commitment is required."
-        assert len(evidence_rules_commitment) > 0, "Evidence rules commitment is required."
-        assert maximum_exposure > u256(0), "Maximum exposure must be positive."
-        assert required_funding > u256(0), "Required funding must be positive."
-        assert required_funding <= maximum_exposure, "Required funding cannot exceed maximum exposure."
-        assert acceptance_window_days >= u256(1), "Acceptance window must be positive."
-        assert performance_window_days >= u256(1), "Performance window must be positive."
-        assert dispute_window_days >= u256(1), "Dispute window must be positive."
+        self._require(len(framework_version) > 0, "Framework version is required.")
+        self._require(len(title) >= 1, "Agreement title is required.")
+        self._require(len(description_commitment) > 0, "Description commitment is required.")
+        self._require(len(obligation_commitment) > 0, "Obligation commitment is required.")
+        self._require(len(acceptance_criteria_commitment) > 0, "Acceptance criteria commitment is required.")
+        self._require(len(evidence_rules_commitment) > 0, "Evidence rules commitment is required.")
+        self._require(maximum_exposure > u256(0), "Maximum exposure must be positive.")
+        self._require(required_funding > u256(0), "Required funding must be positive.")
+        self._require(required_funding <= maximum_exposure, "Required funding cannot exceed maximum exposure.")
+        self._require(acceptance_window_days >= u256(1), "Acceptance window must be positive.")
+        self._require(performance_window_days >= u256(1), "Performance window must be positive.")
+        self._require(dispute_window_days >= u256(1), "Dispute window must be positive.")
 
         permitted = json.loads(permitted_remedies_json)
-        assert isinstance(permitted, list) and len(permitted) > 0, "At least one permitted remedy is required."
+        self._require(isinstance(permitted, list) and len(permitted) > 0, "At least one permitted remedy is required.")
         for remedy in permitted:
             self._check_remedy(str(remedy))
         assert "NO_ACTION" in [str(item) for item in permitted], (
@@ -1201,11 +1212,11 @@ class LexoraArbitration(gl.Contract):
     def accept_agreement(self, agreement_id: str, version: u256, commitment: str) -> None:
         agreement = self._get_agreement(agreement_id)
         caller = str(gl.message.sender_address)
-        assert agreement.acceptance_state == "PROPOSED", "Agreement is not proposed."
-        assert caller.lower() == agreement.counterparty.lower(), "Only the counterparty may accept."
-        assert int(self._agreement_now()) <= int(agreement.acceptance_deadline_ts), "Agreement acceptance window has expired."
-        assert version == agreement.version, "Agreement version mismatch."
-        assert commitment == agreement.commitment, "Agreement commitment mismatch."
+        self._require(agreement.acceptance_state == "PROPOSED", "Agreement is not proposed.")
+        self._require(caller.lower() == agreement.counterparty.lower(), "Only the counterparty may accept.")
+        self._require(int(self._agreement_now()) <= int(agreement.acceptance_deadline_ts), "Agreement acceptance window has expired.")
+        self._require(version == agreement.version, "Agreement version mismatch.")
+        self._require(commitment == agreement.commitment, "Agreement commitment mismatch.")
         agreement.acceptance_state = "ACCEPTED"
         agreement.lifecycle_state = "ACCEPTED_PENDING_FUNDING"
         agreement.accepted_at = self._agreement_now()
@@ -1216,8 +1227,8 @@ class LexoraArbitration(gl.Contract):
     def cancel_agreement(self, agreement_id: str) -> None:
         agreement = self._get_agreement(agreement_id)
         caller = str(gl.message.sender_address)
-        assert caller.lower() == agreement.creator.lower(), "Only the creator may cancel."
-        assert agreement.acceptance_state == "PROPOSED", "Accepted agreements cannot be cancelled here."
+        self._require(caller.lower() == agreement.creator.lower(), "Only the creator may cancel.")
+        self._require(agreement.acceptance_state == "PROPOSED", "Accepted agreements cannot be cancelled here.")
         agreement.acceptance_state = "CANCELLED"
         agreement.lifecycle_state = "CANCELLED"
         self.agreements[agreement_id] = agreement
@@ -1229,13 +1240,13 @@ class LexoraArbitration(gl.Contract):
         agreement = self._get_agreement(agreement_id)
         escrow = self._get_escrow(agreement_id)
         caller = str(gl.message.sender_address)
-        assert agreement.acceptance_state == "ACCEPTED", "Agreement must be bilaterally accepted before funding."
-        assert agreement.lifecycle_state in ("ACCEPTED_PENDING_FUNDING", "ACTIVE"), "Agreement cannot receive funding in its current state."
-        assert caller.lower() == agreement.funder.lower(), "Only the designated funder may deposit escrow."
+        self._require(agreement.acceptance_state == "ACCEPTED", "Agreement must be bilaterally accepted before funding.")
+        self._require(agreement.lifecycle_state in ("ACCEPTED_PENDING_FUNDING", "ACTIVE"), "Agreement cannot receive funding in its current state.")
+        self._require(caller.lower() == agreement.funder.lower(), "Only the designated funder may deposit escrow.")
         value = gl.message.value
-        assert value > u256(0), "Escrow deposit must include native GEN value."
+        self._require(value > u256(0), "Escrow deposit must include native GEN value.")
         new_total = int(escrow.total_deposited) + int(value)
-        assert new_total <= int(agreement.required_funding), "Deposit exceeds required funding."
+        self._require(new_total <= int(agreement.required_funding), "Deposit exceeds required funding.")
         escrow.total_deposited = u256(new_total)
         escrow.available = u256(int(escrow.available) + int(value))
         self._assert_escrow_conservation(escrow)
@@ -1253,10 +1264,10 @@ class LexoraArbitration(gl.Contract):
         agreement = self._get_agreement(agreement_id)
         escrow = self._get_escrow(agreement_id)
         caller = str(gl.message.sender_address)
-        assert caller.lower() in (agreement.creator.lower(), agreement.counterparty.lower(), agreement.funder.lower()), "Only an agreement party may activate."
-        assert agreement.acceptance_state == "ACCEPTED", "Agreement has not been accepted."
-        assert agreement.lifecycle_state == "ACCEPTED_PENDING_FUNDING", "Agreement is not awaiting funding."
-        assert escrow.total_deposited == agreement.required_funding, "Required GEN escrow is not fully funded."
+        self._require(caller.lower() in (agreement.creator.lower(), agreement.counterparty.lower(), agreement.funder.lower()), "Only an agreement party may activate.")
+        self._require(agreement.acceptance_state == "ACCEPTED", "Agreement has not been accepted.")
+        self._require(agreement.lifecycle_state == "ACCEPTED_PENDING_FUNDING", "Agreement is not awaiting funding.")
+        self._require(escrow.total_deposited == agreement.required_funding, "Required GEN escrow is not fully funded.")
         agreement.lifecycle_state = "ACTIVE"
         self.agreements[agreement_id] = agreement
         self._emit_audit(agreement_id, "AGREEMENT_ACTIVATED", caller, "manual activation after full funding")
@@ -1273,7 +1284,7 @@ class LexoraArbitration(gl.Contract):
         confidential: bool,
     ) -> str:
         """Legacy history-only entry point. New disputes must use open_dispute."""
-        assert False, "Legacy create_case is disabled. Use open_dispute with an ACTIVE funded agreement."
+        self._require(False, "Legacy create_case is disabled. Use open_dispute with an ACTIVE funded agreement.")
         return ""
 
     @gl.public.write
@@ -1289,23 +1300,23 @@ class LexoraArbitration(gl.Contract):
         agreement = self._get_agreement(agreement_id)
         escrow = self._get_escrow(agreement_id)
         caller = str(gl.message.sender_address)
-        assert agreement.lifecycle_state == "ACTIVE", "Disputes require an ACTIVE funded agreement."
-        assert caller.lower() in (agreement.creator.lower(), agreement.counterparty.lower()), "Only an accepted agreement party may open a dispute."
-        assert int(self._agreement_now()) <= int(agreement.dispute_deadline_ts), "Agreement dispute window has expired."
-        assert escrow.active_dispute_id == "", "Only one unresolved monetary dispute is allowed per agreement."
-        assert len(title) >= 5, "Title must be at least 5 characters."
-        assert len(case_manifest_hash) > 0, "Case manifest hash is required."
-        assert response_deadline_days >= u256(1) and response_deadline_days <= u256(90), "Response deadline must be 1-90 days."
+        self._require(agreement.lifecycle_state == "ACTIVE", "Disputes require an ACTIVE funded agreement.")
+        self._require(caller.lower() in (agreement.creator.lower(), agreement.counterparty.lower()), "Only an accepted agreement party may open a dispute.")
+        self._require(int(self._agreement_now()) <= int(agreement.dispute_deadline_ts), "Agreement dispute window has expired.")
+        self._require(escrow.active_dispute_id == "", "Only one unresolved monetary dispute is allowed per agreement.")
+        self._require(len(title) >= 5, "Title must be at least 5 characters.")
+        self._require(len(case_manifest_hash) > 0, "Case manifest hash is required.")
+        self._require(response_deadline_days >= u256(1) and response_deadline_days <= u256(90), "Response deadline must be 1-90 days.")
 
         claimant = caller
         respondent = agreement.counterparty if caller.lower() == agreement.creator.lower() else agreement.creator
         reserve = min(int(escrow.available), int(agreement.maximum_exposure))
-        assert reserve > 0, "No available escrow can be reserved for this dispute."
+        self._require(reserve > 0, "No available escrow can be reserved for this dispute.")
 
         case_id = self._next_case_id()
         now = self._agreement_now()
         deadline = u256(int(now) + int(response_deadline_days) * 86400)
-        assert int(deadline) <= int(agreement.dispute_deadline_ts), "Response deadline exceeds the agreement dispute window."
+        self._require(int(deadline) <= int(agreement.dispute_deadline_ts), "Response deadline exceeds the agreement dispute window.")
 
         escrow.available = u256(int(escrow.available) - reserve)
         escrow.reserved = u256(int(escrow.reserved) + reserve)
@@ -1348,11 +1359,11 @@ class LexoraArbitration(gl.Contract):
         case = self._get_case(case_id)
         self._check_status(case, "AWAITING_RESPONDENT", "SUBMISSIONS_OPEN")
         caller = str(gl.message.sender_address)
-        assert caller.lower() == case.claimant.lower(), "Only the claimant may submit a claim."
-        assert len(case.claim_hash) == 0, "The original claim is immutable once submitted."
-        assert len(claim_hash) > 0, "Claim hash is required."
+        self._require(caller.lower() == case.claimant.lower(), "Only the claimant may submit a claim.")
+        self._require(len(case.claim_hash) == 0, "The original claim is immutable once submitted.")
+        self._require(len(claim_hash) > 0, "Claim hash is required.")
         if case.agreement_id:
-            assert not evidence_root, "Agreement disputes use immutable evidence records, not a replaceable evidence root."
+            self._require(not evidence_root, "Agreement disputes use immutable evidence records, not a replaceable evidence root.")
         case.claim_hash = claim_hash
         case.status = "SUBMISSIONS_OPEN"
         case.timestamps.claim_submitted_at = self._agreement_now()
@@ -1372,13 +1383,13 @@ class LexoraArbitration(gl.Contract):
         case = self._get_case(case_id)
         self._check_status(case, "SUBMISSIONS_OPEN")
         caller = str(gl.message.sender_address)
-        assert caller.lower() == case.respondent.lower(), "Only the respondent may submit a response."
-        assert int(self._agreement_now()) <= int(case.response_deadline_ts), "Response window has expired."
-        assert len(case.claim_hash) > 0, "Claimant must submit their claim before respondent can respond."
-        assert len(case.response_hash) == 0, "The original response is immutable once submitted."
-        assert len(response_hash) > 0, "Response hash is required."
+        self._require(caller.lower() == case.respondent.lower(), "Only the respondent may submit a response.")
+        self._require(int(self._agreement_now()) <= int(case.response_deadline_ts), "Response window has expired.")
+        self._require(len(case.claim_hash) > 0, "Claimant must submit their claim before respondent can respond.")
+        self._require(len(case.response_hash) == 0, "The original response is immutable once submitted.")
+        self._require(len(response_hash) > 0, "Response hash is required.")
         if case.agreement_id:
-            assert not evidence_root, "Agreement disputes use immutable evidence records, not a replaceable evidence root."
+            self._require(not evidence_root, "Agreement disputes use immutable evidence records, not a replaceable evidence root.")
         case.response_hash = response_hash
         case.status = "RESPONSE_WINDOW"
         case.timestamps.response_submitted_at = self._agreement_now()
@@ -1397,8 +1408,8 @@ class LexoraArbitration(gl.Contract):
     ) -> None:
         case = self._get_case(case_id)
         if case.agreement_id:
-            assert False, "Replaceable evidence roots are disabled for agreement disputes. Use submit_evidence_record."
-        assert False, "Legacy evidence mutation is disabled for new writes."
+            self._require(False, "Replaceable evidence roots are disabled for agreement disputes. Use submit_evidence_record.")
+        self._require(False, "Legacy evidence mutation is disabled for new writes.")
 
     @gl.public.write
     def submit_evidence_record(
@@ -1411,29 +1422,29 @@ class LexoraArbitration(gl.Contract):
         commitment: str,
     ) -> str:
         case = self._get_case(case_id)
-        assert case.evidence_state == "EVIDENCE_OPEN", "Original evidence is locked."
+        self._require(case.evidence_state == "EVIDENCE_OPEN", "Original evidence is locked.")
         self._check_status(case, "AWAITING_RESPONDENT", "SUBMISSIONS_OPEN", "RESPONSE_WINDOW")
         caller = str(gl.message.sender_address)
-        assert caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a dispute party may submit evidence."
+        self._require(caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a dispute party may submit evidence.")
         allowed_classes = [
             "CLAIMANT_EVIDENCE", "RESPONDENT_EVIDENCE", "COUNTER_EVIDENCE",
             "AGREEMENT_NATIVE", "PUBLIC_WEB",
         ]
-        assert evidence_class in allowed_classes, "Unsupported evidence class."
+        self._require(evidence_class in allowed_classes, "Unsupported evidence class.")
         if evidence_class == "CLAIMANT_EVIDENCE":
-            assert caller.lower() == case.claimant.lower(), "Only the claimant may submit claimant evidence."
+            self._require(caller.lower() == case.claimant.lower(), "Only the claimant may submit claimant evidence.")
         if evidence_class == "RESPONDENT_EVIDENCE":
-            assert caller.lower() == case.respondent.lower(), "Only the respondent may submit respondent evidence."
-        assert len(evidence_type) > 0, "Evidence type is required."
-        assert len(description) > 0, "Evidence description is required."
-        assert len(commitment) > 0, "Evidence commitment is required."
+            self._require(caller.lower() == case.respondent.lower(), "Only the respondent may submit respondent evidence.")
+        self._require(len(evidence_type) > 0, "Evidence type is required.")
+        self._require(len(description) > 0, "Evidence description is required.")
+        self._require(len(commitment) > 0, "Evidence commitment is required.")
         if source_url:
             self._validate_public_url(source_url)
         if evidence_class == "PUBLIC_WEB":
-            assert source_url, "Public web evidence requires a source URL."
+            self._require(source_url, "Public web evidence requires a source URL.")
 
         dedup_key = case_id + ":" + commitment
-        assert dedup_key not in self.evidence_dedup, "Duplicate evidence commitment."
+        self._require(dedup_key not in self.evidence_dedup, "Duplicate evidence commitment.")
         evidence_id = self._next_evidence_id()
         record = EvidenceRecord(
             evidence_id=evidence_id, dispute_id=case_id, submitter=caller,
@@ -1453,15 +1464,15 @@ class LexoraArbitration(gl.Contract):
     def lock_evidence(self, case_id: str) -> None:
         case = self._get_case(case_id)
         caller = str(gl.message.sender_address)
-        assert caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a dispute party may lock evidence."
-        assert case.evidence_state == "EVIDENCE_OPEN", "Evidence is already locked."
-        assert len(case.claim_hash) > 0, "A claim is required before evidence can be locked."
+        self._require(caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a dispute party may lock evidence.")
+        self._require(case.evidence_state == "EVIDENCE_OPEN", "Evidence is already locked.")
+        self._require(len(case.claim_hash) > 0, "A claim is required before evidence can be locked.")
         response_ready = (
             len(case.response_hash) > 0
             or int(self._agreement_now()) > int(case.response_deadline_ts)
         )
-        assert response_ready, "Evidence cannot be locked before the response is submitted or its window expires."
-        assert case_id in self.case_evidence_ids, "At least one immutable evidence record is required."
+        self._require(response_ready, "Evidence cannot be locked before the response is submitted or its window expires.")
+        self._require(case_id in self.case_evidence_ids, "At least one immutable evidence record is required.")
         snapshot = self._case_evidence_snapshot(case_id)
         case.evidence_root = self._evidence_commitment(snapshot)
         case.evidence_state = "EVIDENCE_LOCKED"
@@ -1475,37 +1486,38 @@ class LexoraArbitration(gl.Contract):
         case = self._get_case(case_id)
         self._check_status(case, "SUBMISSIONS_OPEN", "RESPONSE_WINDOW")
         caller = str(gl.message.sender_address)
-        assert caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a party to the case may request a ruling."
-        assert case.evidence_state == "EVIDENCE_LOCKED", "Original evidence must be locked before ruling."
-        assert len(case.claim_hash) > 0, "A claim must be submitted before requesting a ruling."
-        assert (
+        self._require(caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a party to the case may request a ruling.")
+        self._require(case.evidence_state == "EVIDENCE_LOCKED", "Original evidence must be locked before ruling.")
+        self._require(len(case.claim_hash) > 0, "A claim must be submitted before requesting a ruling.")
+        self._require(
             len(case.response_hash) > 0
-            or int(self._agreement_now()) > int(case.response_deadline_ts)
-        ), "A ruling cannot be requested before the response is submitted or its window expires."
+            or int(self._agreement_now()) > int(case.response_deadline_ts),
+            "A ruling cannot be requested before the response is submitted or its window expires.",
+        )
 
         review_packet = json.loads(review_packet_json)
-        assert isinstance(review_packet, dict), "review_packet_json must be a JSON object."
-        assert review_packet.get("caseId") == case_id, "Review packet caseId does not match the case."
+        self._require(isinstance(review_packet, dict), "review_packet_json must be a JSON object.")
+        self._require(review_packet.get("caseId") == case_id, "Review packet caseId does not match the case.")
         claimant_statement = str(review_packet.get("claimantStatement", ""))
         respondent_statement = str(review_packet.get("respondentStatement", ""))
-        assert "0x" + hashlib.sha256(claimant_statement.encode()).hexdigest() == case.claim_hash, "Claimant statement does not match its stored commitment."
+        self._require("0x" + hashlib.sha256(claimant_statement.encode()).hexdigest() == case.claim_hash, "Claimant statement does not match its stored commitment.")
         if case.response_hash:
-            assert "0x" + hashlib.sha256(respondent_statement.encode()).hexdigest() == case.response_hash, "Respondent statement does not match its stored commitment."
+            self._require("0x" + hashlib.sha256(respondent_statement.encode()).hexdigest() == case.response_hash, "Respondent statement does not match its stored commitment.")
 
         evidence = self._case_evidence_snapshot(case_id)
         evidence_commitment = self._evidence_commitment(evidence)
-        assert evidence_commitment == case.evidence_root, "Locked evidence commitment mismatch."
-        assert review_packet.get("evidenceCommitment") == evidence_commitment, "Review packet evidence digest mismatch."
+        self._require(evidence_commitment == case.evidence_root, "Locked evidence commitment mismatch.")
+        self._require(review_packet.get("evidenceCommitment") == evidence_commitment, "Review packet evidence digest mismatch.")
         review_packet["evidence"] = evidence
         packet_state = review_packet.get("proceduralState", {})
-        assert packet_state.get("claimHash") == case.claim_hash, "Review packet claim commitment mismatch."
-        assert packet_state.get("responseHash") == (case.response_hash or None), "Review packet response commitment mismatch."
-        assert packet_state.get("evidenceRoot") == case.evidence_root, "Review packet evidence commitment mismatch."
+        self._require(packet_state.get("claimHash") == case.claim_hash, "Review packet claim commitment mismatch.")
+        self._require(packet_state.get("responseHash") == (case.response_hash or None), "Review packet response commitment mismatch.")
+        self._require(packet_state.get("evidenceRoot") == case.evidence_root, "Review packet evidence commitment mismatch.")
         expected_packet_commitment = self._packet_commitment(
             case_id, case.framework_id, claimant_statement, respondent_statement,
             evidence_commitment, case.claim_hash, case.response_hash, case.evidence_root,
         )
-        assert review_packet.get("packetCommitment") == expected_packet_commitment, "Ruling packet commitment mismatch."
+        self._require(review_packet.get("packetCommitment") == expected_packet_commitment, "Ruling packet commitment mismatch.")
 
         agreement = self._get_agreement(case.agreement_id)
         ruling_id = self._next_ruling_id()
@@ -1605,7 +1617,7 @@ class LexoraArbitration(gl.Contract):
     @gl.public.write
     def accept_ruling(self, case_id: str, ruling_id: str) -> None:
         # No write path may bypass the application appeal window or settlement accounting.
-        assert False, "accept_ruling cannot bypass the appeal/finality/settlement lifecycle."
+        self._require(False, "accept_ruling cannot bypass the appeal/finality/settlement lifecycle.")
 
     @gl.public.write
     def submit_appeal_evidence(
@@ -1618,14 +1630,14 @@ class LexoraArbitration(gl.Contract):
     ) -> str:
         case = self._get_case(case_id)
         self._check_status(case, "RULING_ISSUED")
-        assert int(self._agreement_now()) <= int(case.appeal_deadline_ts), "Application appeal window has expired."
+        self._require(int(self._agreement_now()) <= int(case.appeal_deadline_ts), "Application appeal window has expired.")
         caller = str(gl.message.sender_address)
-        assert caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a dispute party may append appeal evidence."
-        assert len(evidence_type) > 0 and len(description) > 0 and len(commitment) > 0, "Appeal evidence fields are required."
+        self._require(caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a dispute party may append appeal evidence.")
+        self._require(len(evidence_type) > 0 and len(description) > 0 and len(commitment) > 0, "Appeal evidence fields are required.")
         if source_url:
             self._validate_public_url(source_url)
         dedup_key = case_id + ":appeal:" + commitment
-        assert dedup_key not in self.evidence_dedup, "Duplicate appeal evidence commitment."
+        self._require(dedup_key not in self.evidence_dedup, "Duplicate appeal evidence commitment.")
         evidence_id = self._next_evidence_id()
         self.evidence_records[evidence_id] = EvidenceRecord(
             evidence_id=evidence_id, dispute_id=case_id, submitter=caller,
@@ -1645,16 +1657,16 @@ class LexoraArbitration(gl.Contract):
         case = self._get_case(case_id)
         self._check_status(case, "RULING_ISSUED")
         caller = str(gl.message.sender_address)
-        assert caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a party may appeal."
-        assert int(self._agreement_now()) <= int(case.appeal_deadline_ts), "Application appeal window has expired."
-        assert len(case.appeal_id) == 0, "Only one application-level appeal is permitted."
+        self._require(caller.lower() in (case.claimant.lower(), case.respondent.lower()), "Only a party may appeal.")
+        self._require(int(self._agreement_now()) <= int(case.appeal_deadline_ts), "Application appeal window has expired.")
+        self._require(len(case.appeal_id) == 0, "Only one application-level appeal is permitted.")
         original = self._get_ruling(case.initial_ruling_id)
 
         appeal_packet = json.loads(appeal_packet_json)
-        assert isinstance(appeal_packet, dict), "appeal_packet_json must be a JSON object."
+        self._require(isinstance(appeal_packet, dict), "appeal_packet_json must be a JSON object.")
         ground = str(appeal_packet.get("appealGround", ""))
-        assert ground in VALID_APPEAL_GROUNDS, f"Invalid appeal ground '{ground}'. Allowed: {VALID_APPEAL_GROUNDS}"
-        assert len(str(appeal_packet.get("appealStatement", "")).strip()) > 0, "Appeal statement is required."
+        self._require(ground in VALID_APPEAL_GROUNDS, f"Invalid appeal ground '{ground}'. Allowed: {VALID_APPEAL_GROUNDS}")
+        self._require(len(str(appeal_packet.get("appealStatement", "")).strip()) > 0, "Appeal statement is required.")
         appeal_evidence = self._case_evidence_snapshot(case_id, True)
         appeal_packet["newEvidence"] = appeal_evidence
         prompt = self._build_appeal_prompt(original, appeal_packet, case.framework_id)
@@ -1751,8 +1763,8 @@ class LexoraArbitration(gl.Contract):
     def finalize_no_appeal(self, case_id: str) -> None:
         case = self._get_case(case_id)
         self._check_status(case, "RULING_ISSUED")
-        assert len(case.appeal_id) == 0, "An appeal already exists."
-        assert int(self._agreement_now()) > int(case.appeal_deadline_ts), "Application appeal window is still open."
+        self._require(len(case.appeal_id) == 0, "An appeal already exists.")
+        self._require(int(self._agreement_now()) > int(case.appeal_deadline_ts), "Application appeal window is still open.")
         case.final_ruling_id = case.initial_ruling_id
         case.ruling_id = case.initial_ruling_id
         case.status = "FINAL_RULING"
@@ -1766,7 +1778,7 @@ class LexoraArbitration(gl.Contract):
         case = self._get_case(case_id)
         self._check_status(case, "AWAITING_RESPONDENT", "SUBMISSIONS_OPEN", "RESPONSE_WINDOW")
         caller = str(gl.message.sender_address)
-        assert caller.lower() == case.claimant.lower(), "Only the claimant may cancel a pre-ruling dispute."
+        self._require(caller.lower() == case.claimant.lower(), "Only the claimant may cancel a pre-ruling dispute.")
         self._release_case_reservation(case)
         case.status = "CANCELLED"
         case.settlement_state = "CANCELLED"
@@ -1777,16 +1789,16 @@ class LexoraArbitration(gl.Contract):
 
     @gl.public.write
     def mark_settled(self, case_id: str) -> None:
-        assert False, "mark_settled is disabled. Settlement must follow final ruling accounting."
+        self._require(False, "mark_settled is disabled. Settlement must follow final ruling accounting.")
 
     @gl.public.write
     def finalize_zero_award_settlement(self, case_id: str) -> None:
         case = self._get_case(case_id)
-        assert case.status == "SETTLEMENT_READY", "Settlement is not ready."
-        assert case_id in self.settlements, "Settlement record is missing."
+        self._require(case.status == "SETTLEMENT_READY", "Settlement is not ready.")
+        self._require(case_id in self.settlements, "Settlement record is missing.")
         settlement = self.settlements[case_id]
-        assert settlement.state == "READY", "Settlement has already been finalized."
-        assert settlement.award_amount == u256(0), "Monetary settlements require an actual GEN transfer before PAID state."
+        self._require(settlement.state == "READY", "Settlement has already been finalized.")
+        self._require(settlement.award_amount == u256(0), "Monetary settlements require an actual GEN transfer before PAID state.")
         escrow = self._get_escrow(case.agreement_id)
         settlement.state = "SETTLED"
         self.settlements[case_id] = settlement
@@ -1812,16 +1824,16 @@ class LexoraArbitration(gl.Contract):
         before a later upgrade introduces CLAIMABLE -> PAID confirmation.
         """
         case = self._get_case(case_id)
-        assert case.status == "SETTLEMENT_READY", "Settlement is not ready."
-        assert case_id in self.settlements, "Settlement record is missing."
+        self._require(case.status == "SETTLEMENT_READY", "Settlement is not ready.")
+        self._require(case_id in self.settlements, "Settlement record is missing.")
         settlement = self.settlements[case_id]
-        assert settlement.state == "READY", "Payout has already been scheduled or settled."
+        self._require(settlement.state == "READY", "Payout has already been scheduled or settled.")
         amount = int(settlement.award_amount)
-        assert amount > 0, "Zero-award settlements do not need an outward transfer."
-        assert len(settlement.recipient) > 0, "Settlement recipient is missing."
+        self._require(amount > 0, "Zero-award settlements do not need an outward transfer.")
+        self._require(len(settlement.recipient) > 0, "Settlement recipient is missing.")
 
         escrow = self._get_escrow(case.agreement_id)
-        assert int(escrow.claimable) >= amount, "Claimable escrow is insufficient."
+        self._require(int(escrow.claimable) >= amount, "Claimable escrow is insufficient.")
         _GenRecipient(Address(settlement.recipient)).emit_transfer(value=u256(amount))
 
         settlement.state = "TRANSFER_EMITTED"
@@ -1841,11 +1853,11 @@ class LexoraArbitration(gl.Contract):
         agreement = self._get_agreement(agreement_id)
         escrow = self._get_escrow(agreement_id)
         caller = str(gl.message.sender_address)
-        assert caller.lower() == agreement.funder.lower(), "Only the designated funder may prepare a refund."
-        assert escrow.active_dispute_id == "", "An unresolved dispute still controls this escrow."
-        assert int(self._agreement_now()) > int(agreement.dispute_deadline_ts), "Agreement dispute window is still open."
+        self._require(caller.lower() == agreement.funder.lower(), "Only the designated funder may prepare a refund.")
+        self._require(escrow.active_dispute_id == "", "An unresolved dispute still controls this escrow.")
+        self._require(int(self._agreement_now()) > int(agreement.dispute_deadline_ts), "Agreement dispute window is still open.")
         amount = int(escrow.available)
-        assert amount > 0, "No available escrow is refundable."
+        self._require(amount > 0, "No available escrow is refundable.")
         escrow.available = u256(0)
         escrow.refundable = u256(int(escrow.refundable) + amount)
         self._assert_escrow_conservation(escrow)
@@ -1863,10 +1875,10 @@ class LexoraArbitration(gl.Contract):
         agreement = self._get_agreement(agreement_id)
         escrow = self._get_escrow(agreement_id)
         caller = str(gl.message.sender_address)
-        assert caller.lower() == agreement.funder.lower(), "Only the designated funder may execute the refund."
-        assert not escrow.refund_transfer_pending, "Refund transfer has already been scheduled."
+        self._require(caller.lower() == agreement.funder.lower(), "Only the designated funder may execute the refund.")
+        self._require(not escrow.refund_transfer_pending, "Refund transfer has already been scheduled.")
         amount = int(escrow.refundable)
-        assert amount > 0, "No refundable escrow is available."
+        self._require(amount > 0, "No refundable escrow is available.")
 
         _GenRecipient(Address(agreement.funder)).emit_transfer(value=u256(amount))
         escrow.refund_transfer_pending = True
@@ -1931,7 +1943,7 @@ class LexoraArbitration(gl.Contract):
 
     @gl.public.view
     def get_settlement(self, case_id: str) -> str:
-        assert case_id in self.settlements, f"Settlement not found: {case_id}"
+        self._require(case_id in self.settlements, f"Settlement not found: {case_id}")
         item = self.settlements[case_id]
         return json.dumps({
             "disputeId": item.dispute_id, "agreementId": item.agreement_id,
@@ -1977,7 +1989,7 @@ class LexoraArbitration(gl.Contract):
 
     @gl.public.view
     def get_evidence_record(self, evidence_id: str) -> str:
-        assert evidence_id in self.evidence_records, f"Evidence not found: {evidence_id}"
+        self._require(evidence_id in self.evidence_records, f"Evidence not found: {evidence_id}")
         ev = self.evidence_records[evidence_id]
         return json.dumps({
             "evidenceId": ev.evidence_id, "disputeId": ev.dispute_id,
@@ -2126,7 +2138,7 @@ class LexoraArbitration(gl.Contract):
     @gl.public.view
     def get_audit_event(self, event_id: str) -> str:
         """Return a single audit event as a JSON string."""
-        assert event_id in self.audit_log, f"Audit event not found: {event_id}"
+        self._require(event_id in self.audit_log, f"Audit event not found: {event_id}")
         ev = self.audit_log[event_id]
         return json.dumps({
             "eventId":   ev.event_id,
