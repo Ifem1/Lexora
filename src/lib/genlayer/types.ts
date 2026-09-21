@@ -195,6 +195,7 @@ export type EscrowAccount = {
   refunded: number;
   refundedWei?: string;
   activeDisputeId: string;
+  refundTransferPending?: boolean;
 };
 
 export type SettlementRecord = {
