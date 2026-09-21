@@ -1816,14 +1816,12 @@ class LexoraArbitration(gl.Contract):
 
     @gl.public.write
     def execute_claimable_payout(self, case_id: str) -> None:
-        """
-        Schedule the claimable award as a finalization-bound external GEN transfer.
+        """Finalize a monetary settlement with an external GEN transfer.
 
-        The settlement is locked as TRANSFER_EMITTED to prevent replay. Accounting
-        intentionally remains CLAIMABLE rather than PAID because external messages
-        are asynchronous and this contract has no trustworthy synchronous success
-        return. Codex/live verification must prove the emitted transfer completed
-        before a later upgrade introduces CLAIMABLE -> PAID confirmation.
+        EOA/EVM transfers are external GenLayer messages and therefore execute only
+        when this parent transaction finalizes. Emission freezes the value from the
+        contract's ghost balance; if emission/execution cannot be scheduled, this
+        write does not commit and PAID accounting is not persisted.
         """
         case = self._get_case(case_id)
         self._require(case.status == "SETTLEMENT_READY", "Settlement is not ready.")
@@ -1836,17 +1834,30 @@ class LexoraArbitration(gl.Contract):
 
         escrow = self._get_escrow(case.agreement_id)
         self._require(int(escrow.claimable) >= amount, "Claimable escrow is insufficient.")
+        self._require(int(self.balance) >= amount, "Contract GEN balance is insufficient for settlement.")
+
         _GenRecipient(Address(settlement.recipient)).emit_transfer(value=u256(amount))
 
-        settlement.state = "TRANSFER_EMITTED"
+        escrow.claimable = u256(int(escrow.claimable) - amount)
+        escrow.paid = u256(int(escrow.paid) + amount)
+        escrow.active_dispute_id = ""
+        self._assert_escrow_conservation(escrow)
+        self.escrows[case.agreement_id] = escrow
+
+        now = self._agreement_now()
+        settlement.state = "PAID"
+        settlement.paid_at = now
         self.settlements[case_id] = settlement
-        case.settlement_state = "TRANSFER_EMITTED"
-        case.timestamps.updated_at = self._agreement_now()
+        case.status = "SETTLED"
+        case.settlement_state = "PAID"
+        case.timestamps.settled_at = now
+        case.timestamps.updated_at = now
         self.cases[case_id] = case
-        self._emit_audit(case_id, "PAYOUT_TRANSFER_EMITTED", str(gl.message.sender_address), json.dumps({
+        self.stats.total_settled = u256(int(self.stats.total_settled) + 1)
+        self._emit_audit(case_id, "PAYOUT_FINALIZED", str(gl.message.sender_address), json.dumps({
             "recipient": settlement.recipient,
             "value": amount,
-            "accounting": "CLAIMABLE_PENDING_LIVE_CONFIRMATION",
+            "accounting": "CLAIMABLE_TO_PAID_ON_FINALIZATION",
         }))
 
     @gl.public.write
@@ -1868,12 +1879,7 @@ class LexoraArbitration(gl.Contract):
 
     @gl.public.write
     def execute_funder_refund(self, agreement_id: str) -> None:
-        """
-        Schedule REFUNDABLE value to the designated funder on finalization.
-
-        The refundable bucket remains unchanged until live confirmation because the
-        external message is asynchronous. refund_transfer_pending prevents replay.
-        """
+        """Finalize REFUNDABLE GEN back to the immutable designated funder."""
         agreement = self._get_agreement(agreement_id)
         escrow = self._get_escrow(agreement_id)
         caller = str(gl.message.sender_address)
@@ -1881,14 +1887,19 @@ class LexoraArbitration(gl.Contract):
         self._require(not escrow.refund_transfer_pending, "Refund transfer has already been scheduled.")
         amount = int(escrow.refundable)
         self._require(amount > 0, "No refundable escrow is available.")
+        self._require(int(self.balance) >= amount, "Contract GEN balance is insufficient for refund.")
 
         _GenRecipient(Address(agreement.funder)).emit_transfer(value=u256(amount))
-        escrow.refund_transfer_pending = True
+
+        escrow.refundable = u256(0)
+        escrow.refunded = u256(int(escrow.refunded) + amount)
+        escrow.refund_transfer_pending = False
+        self._assert_escrow_conservation(escrow)
         self.escrows[agreement_id] = escrow
-        self._emit_audit(agreement_id, "REFUND_TRANSFER_EMITTED", caller, json.dumps({
+        self._emit_audit(agreement_id, "REFUND_FINALIZED", caller, json.dumps({
             "recipient": agreement.funder,
             "value": amount,
-            "accounting": "REFUNDABLE_PENDING_LIVE_CONFIRMATION",
+            "accounting": "REFUNDABLE_TO_REFUNDED_ON_FINALIZATION",
         }))
 
     # ── Public View Methods ────────────────────────────────────────────────────    # ── Public View Methods ────────────────────────────────────────────────────
