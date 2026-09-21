@@ -9,10 +9,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: lexora-appeal-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GENVM_VERSION: v0.6.0-rc6
+  GENVM_MANAGER_BUNDLE_SHA256: bd30580f911338d5533460eca8ed714dec371de5803c04e41dbb96430aea7b6e
+
 jobs:
   contract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,8 +33,25 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "genlayer-test==0.29.2" "genvm-linter==0.11.0"
           python --version
-          gltest --version || true
+          python - <<'PY'
+          import importlib.metadata
+          for package in ("genlayer-test", "genvm-linter", "genlayer-py"):
+              print(f"{package}={importlib.metadata.version(package)}")
+          PY
           genvm-lint --version || true
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/gltest-direct
+          key: gltest-direct-genvm-manager-v0.6.0-rc6
+      - name: Prepare current GenVM runner bundle
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cache/gltest-direct"
+          bundle="$HOME/.cache/gltest-direct/genvm-universal-$GENVM_VERSION.tar.xz"
+          if [ ! -s "$bundle" ]; then
+            curl --fail --location --retry 3               "https://github.com/genlayerlabs/genvm-manager/releases/download/$GENVM_VERSION/genvm-universal.tar.xz"               --output "$bundle"
+          fi
+          echo "$GENVM_MANAGER_BUNDLE_SHA256  $bundle" | sha256sum --check -
       - name: GenVM lint and schema
         run: |
           genvm-lint check contracts/LexoraArbitration.py
