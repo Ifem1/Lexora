@@ -7,8 +7,8 @@ export type CaseStatus =
   | "RESPONSE_WINDOW"
   | "UNDER_REVIEW"
   | "RULING_ISSUED"
-  | "ACCEPTED"
-  | "APPEALED"
+  | "FINAL_RULING"
+  | "SETTLEMENT_READY"
   | "SETTLED"
   | "CANCELLED";
 
@@ -16,6 +16,7 @@ export type CaseStatus =
 
 export type ArbitrationCase = {
   caseId: string;
+  agreementId?: string;
   title: string;
   category: string;
   claimant: string;
@@ -25,7 +26,14 @@ export type ArbitrationCase = {
   claimHash: string;
   responseHash?: string;
   evidenceRoot?: string;
+  evidenceState?: "EVIDENCE_OPEN" | "EVIDENCE_LOCKED";
   rulingId?: string;
+  initialRulingId?: string;
+  finalRulingId?: string;
+  appealId?: string;
+  appealDeadlineTs?: number;
+  reservedAmount?: number;
+  settlementState?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -85,10 +93,9 @@ export type EvidenceManifest = {
 export type RulingOutcome =
   | "CLAIMANT_PREVAILS"
   | "RESPONDENT_PREVAILS"
-  | "PARTIAL_SETTLEMENT"
-  | "RENEGOTIATE"
-  | "MORE_EVIDENCE_REQUIRED"
-  | "OUT_OF_SCOPE";
+  | "PARTIAL"
+  | "INSUFFICIENT_EVIDENCE"
+  | "PROCEDURAL_FAILURE";
 
 export type RemedyAction =
   | "PAY"
@@ -128,25 +135,67 @@ export type ArbitrationRuling = {
   evidenceMap: EvidenceMapItem[];
   proceduralWarnings: string[];
   safetyBoundary: string;
+  liabilityBps?: number;
+  boundedAward?: number;
   createdAt: number;
 };
 
 // ─── Appeal ───────────────────────────────────────────────────────────────────
 
 export type AppealGround =
-  | "NEW_EVIDENCE"
-  | "MATERIAL_ERROR"
-  | "FRAMEWORK_MISAPPLIED"
-  | "PROCEDURAL_UNFAIRNESS"
-  | "EVIDENCE_MISUNDERSTOOD"
-  | "REMEDY_DISPROPORTIONATE";
+  | "MATERIAL_NEW_EVIDENCE"
+  | "EVIDENCE_RETRIEVAL_FAILURE"
+  | "MATERIAL_CONTRADICTION"
+  | "PROCEDURAL_ERROR"
+  | "MATERIAL_AGREEMENT_MISAPPLICATION"
+  | "MATERIAL_REMEDY_MISCALCULATION";
 
-export type AppealOutcome =
-  | "UPHOLD"
-  | "REVISE"
-  | "REQUEST_MORE_EVIDENCE"
-  | "PROCEDURAL_ERROR_FOUND"
-  | "OUT_OF_SCOPE";
+export type AppealOutcome = "UPHOLD" | "REVISE" | "PROCEDURAL_FAILURE";
+
+export type Agreement = {
+  agreementId: string;
+  version: number;
+  creator: string;
+  counterparty: string;
+  funder: string;
+  frameworkId: string;
+  frameworkVersion: string;
+  title: string;
+  permittedRemedies: RemedyAction[];
+  maximumExposure: number;
+  requiredFunding: number;
+  acceptanceDeadlineTs: number;
+  performanceDeadlineTs: number;
+  disputeDeadlineTs: number;
+  proposedAt: number;
+  acceptedAt: number;
+  acceptanceState: "PROPOSED" | "ACCEPTED" | "CANCELLED";
+  lifecycleState: "PROPOSED" | "ACCEPTED_PENDING_FUNDING" | "ACTIVE" | "CANCELLED";
+  commitment: string;
+};
+
+export type EscrowAccount = {
+  agreementId: string;
+  totalDeposited: number;
+  available: number;
+  reserved: number;
+  claimable: number;
+  refundable: number;
+  paid: number;
+  refunded: number;
+  activeDisputeId: string;
+};
+
+export type SettlementRecord = {
+  disputeId: string;
+  agreementId: string;
+  state: string;
+  recipient: string;
+  awardAmount: number;
+  releasedAmount: number;
+  preparedAt: number;
+  paidAt: number;
+};
 
 // ─── Review Packet ────────────────────────────────────────────────────────────
 
