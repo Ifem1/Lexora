@@ -31,7 +31,7 @@ export default function CaseRoomPage() {
   const { address, isConnected } = useAccount();
 
   const { caseData, ruling, canRule, loading, refresh } = useCase(caseId);
-  const { submitClaim, submitResponse, requestRuling } = useContract();
+  const { submitClaim, submitResponse, requestRuling, getCaseEvidence } = useContract();
 
   const [claimText, setClaimText] = useState("");
   const [responseText, setResponseText] = useState("");
@@ -111,7 +111,7 @@ export default function CaseRoomPage() {
         framework,
         dossier.claimantStatement,
         dossier.respondentStatement,
-        dossier.evidence,
+        await getCaseEvidence(caseData.caseId, false),
         {}
       );
       const packetJson = serializeReviewPacket(packet);
@@ -206,6 +206,9 @@ export default function CaseRoomPage() {
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.75rem" }}>
+          <Link href={`/app/cases/${caseId}/lifecycle`} style={{ color: "#C69C5D", textDecoration: "none", fontSize: "0.8rem", alignSelf: "center" }}>
+            Evidence / Appeal / Settlement →
+          </Link>
           <button
             onClick={refresh}
             style={{ border: "1px solid rgba(241,232,210,0.2)", background: "transparent", color: "rgba(241,232,210,0.55)", padding: "0.5rem 1rem", borderRadius: "2px", cursor: "pointer", fontSize: "0.8rem" }}
