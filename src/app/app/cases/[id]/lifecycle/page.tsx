@@ -28,7 +28,7 @@ export default function CaseLifecyclePage() {
   const {
     getCase, getSettlement, getCaseEvidence, submitEvidenceRecord, lockEvidence,
     submitAppealEvidence, appealRuling, finalizeNoAppeal,
-    finalizeZeroAwardSettlement,
+    finalizeZeroAwardSettlement, executeClaimablePayout,
   } = useContract();
   const [caseData, setCaseData] = useState<ArbitrationCase | null>(null);
   const [settlement, setSettlement] = useState<SettlementRecord | null>(null);
@@ -186,9 +186,19 @@ export default function CaseLifecyclePage() {
               Finalize zero-award settlement
             </button>
           )}
-          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) > 0n && (
+          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) > 0n && settlement.state === "READY" && (
+            <div style={{ marginTop: 12 }}>
+              <button onClick={() => run("emit payout transfer", () => executeClaimablePayout(caseId))}>
+                Schedule finalization-bound GEN payout
+              </button>
+              <p style={{ opacity: 0.75 }}>
+                This emits the external transfer on finalization and locks replay. Accounting remains CLAIMABLE until Codex/live verification proves the transfer-completion confirmation path.
+              </p>
+            </div>
+          )}
+          {settlement.state === "TRANSFER_EMITTED" && (
             <p style={{ marginTop: 12, opacity: 0.75 }}>
-              Monetary award is claimable but not marked paid. Outward GEN transfer completion is intentionally reserved for the Codex/live runtime verification phase.
+              Finalization-bound payout message emitted. This UI deliberately does not label the award PAID until live transfer completion is verified.
             </p>
           )}
         </section>
