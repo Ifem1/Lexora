@@ -7,6 +7,8 @@ export type CaseStatus =
   | "RESPONSE_WINDOW"
   | "UNDER_REVIEW"
   | "RULING_ISSUED"
+  | "ACCEPTED"
+  | "APPEALED"
   | "FINAL_RULING"
   | "SETTLEMENT_READY"
   | "SETTLED"
