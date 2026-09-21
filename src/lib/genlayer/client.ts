@@ -1,14 +1,14 @@
-import { createClient, chains } from "genlayer-js";
-import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
-
-// ─── Contract Address ─────────────────────────────────────────────────────────
+import { createClient, chains, isSuccessful } from "genlayer-js";
+import { TransactionHashVariant } from "genlayer-js/types";
 
 const configuredContractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 export const CONTRACT_ADDRESS = configuredContractAddress as `0x${string}` | undefined;
 
 function requireContractAddress(): `0x${string}` {
   if (!CONTRACT_ADDRESS) {
-    throw new Error("NEXT_PUBLIC_CONTRACT_ADDRESS is not configured for the rebuilt Lexora deployment.");
+    throw new Error(
+      "NEXT_PUBLIC_CONTRACT_ADDRESS is not configured for the rebuilt Lexora deployment."
+    );
   }
   return CONTRACT_ADDRESS;
 }
@@ -16,19 +16,12 @@ function requireContractAddress(): `0x${string}` {
 const RPC_URL =
   process.env.NEXT_PUBLIC_GENLAYER_RPC_URL ?? "https://studio.genlayer.com/api";
 
-// ─── Singleton Client ─────────────────────────────────────────────────────────
-
 type GenLayerClientType = ReturnType<typeof createClient>;
 export type GenLayerWalletProvider = NonNullable<
   Parameters<typeof createClient>[0]
 >["provider"];
 let _client: GenLayerClientType | null = null;
 
-/**
- * Returns a singleton GenLayer client connected to GenLayer Studio (studionet).
- * Chain ID 61999 matches NEXT_PUBLIC_CHAIN_ID and chains.studionet.
- * We pass a custom rpcUrls so the client targets the configured RPC endpoint.
- */
 export function getGenLayerClient(): GenLayerClientType {
   if (_client) return _client;
 
@@ -44,11 +37,9 @@ export function getGenLayerClient(): GenLayerClientType {
   return _client;
 }
 
-// ─── Read Contract ────────────────────────────────────────────────────────────
-
 /**
- * Call a read-only method on the arbitration contract.
- * Returns the raw result (usually a JSON string from the contract).
+ * Reads the latest finalized Lexora state. This keeps reloads aligned with
+ * durable protocol state rather than a provisional accepted execution.
  */
 export async function readContract(
   method: string,
@@ -57,22 +48,14 @@ export async function readContract(
 ): Promise<unknown> {
   const client = getGenLayerClient();
 
-  const result = await client.readContract({
+  return client.readContract({
     address: requireContractAddress(),
     functionName: method,
     args,
+    transactionHashVariant: TransactionHashVariant.LATEST_FINAL,
   });
-
-  return result;
 }
 
-// ─── Write Contract ───────────────────────────────────────────────────────────
-
-/**
- * Send a state-changing transaction to the arbitration contract.
- * Requires an account address — pass the wagmi wallet's account address.
- * The JSON-RPC provider (MetaMask etc.) will handle signing.
- */
 export async function writeContract(
   account: `0x${string}`,
   method: string,
@@ -81,9 +64,6 @@ export async function writeContract(
   provider?: GenLayerWalletProvider,
   value: bigint = BigInt(0)
 ): Promise<`0x${string}`> {
-  // Write calls must be backed by the connected MetaMask GenLayer Snap.
-  // Passing only an address to the read-only HTTP client falls back to
-  // eth_sendTransaction, which Studionet intentionally does not expose.
   const client = createClient({
     chain: {
       ...chains.studionet,
@@ -103,11 +83,12 @@ export async function writeContract(
   return txHash as `0x${string}`;
 }
 
-// ─── Wait for Ruling ──────────────────────────────────────────────────────────
-
 /**
- * Poll until a GenLayer transaction reaches a finalized/accepted state.
- * GenLayer validator consensus can take seconds to minutes.
+ * Wait for durable GenLayer finalization and verify contract execution.
+ *
+ * An EVM submission receipt or an ACCEPTED consensus state is not surfaced as
+ * success. The caller gets a resolved value only after FINALIZED +
+ * FINISHED_WITH_RETURN.
  */
 export async function waitForRuling(txHash: `0x${string}`): Promise<unknown> {
   const client = getGenLayerClient();
@@ -116,35 +97,34 @@ export async function waitForRuling(txHash: `0x${string}`): Promise<unknown> {
     hash: txHash as unknown as Parameters<
       typeof client.waitForTransactionReceipt
     >[0]["hash"],
-    status: TransactionStatus.FINALIZED,
+    waitUntil: "finalized",
     retries: 120,
     interval: 5000,
   });
 
-  const normalized = receipt as {
-    txExecutionResultName?: string;
-    consensus_data?: { leader_receipt?: Array<{
-      execution_result?: string;
-      genvm_result?: { stderr?: string };
-    }> };
-  };
-
-  if (normalized.txExecutionResultName === ExecutionResult.FINISHED_WITH_ERROR) {
-    const detail = normalized.consensus_data?.leader_receipt?.[0]?.genvm_result?.stderr?.trim();
-    throw new Error(detail || "The finalized GenLayer transaction failed contract execution.");
-  }
-  if (
-    normalized.txExecutionResultName &&
-    normalized.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN
-  ) {
-    throw new Error(`Unexpected finalized execution result: ${normalized.txExecutionResultName}`);
-  }
-
-  // Fallback for receipt shapes that still expose the leader result directly.
-  const leaderReceipt = normalized.consensus_data?.leader_receipt?.[0];
-  if (leaderReceipt?.execution_result === "ERROR") {
-    const detail = leaderReceipt.genvm_result?.stderr?.trim();
-    throw new Error(detail || "The contract rejected this finalized transaction.");
+  if (!isSuccessful(receipt)) {
+    const normalized = receipt as {
+      statusName?: string;
+      status?: string | number;
+      txExecutionResultName?: string;
+      txExecutionResult?: string | number;
+      consensus_data?: {
+        leader_receipt?: Array<{
+          execution_result?: string;
+          genvm_result?: { stderr?: string };
+        }>;
+      };
+    };
+    const detail =
+      normalized.consensus_data?.leader_receipt?.[0]?.genvm_result?.stderr?.trim();
+    const status = normalized.statusName ?? String(normalized.status ?? "UNKNOWN");
+    const execution =
+      normalized.txExecutionResultName ??
+      String(normalized.txExecutionResult ?? "UNKNOWN");
+    throw new Error(
+      detail ||
+        `GenLayer transaction finalized without successful execution: ${status} / ${execution}`
+    );
   }
 
   return receipt;
