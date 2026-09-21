@@ -36,6 +36,7 @@ export default function CaseLifecyclePage() {
   const [appealEvidenceCount, setAppealEvidenceCount] = useState(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [now, setNow] = useState(0);
 
   const refresh = useCallback(async () => {
     const [nextCase, originalEvidence, appealEvidence] = await Promise.all([
@@ -51,7 +52,11 @@ export default function CaseLifecyclePage() {
     }
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    void Promise.resolve().then(refresh);
+    const timer = window.setTimeout(() => setNow(Math.floor(Date.now() / 1000)), 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
 
   async function run(label: string, action: () => Promise<`0x${string}`>) {
     setError("");
@@ -74,7 +79,6 @@ export default function CaseLifecyclePage() {
   const isClaimant = address?.toLowerCase() === caseData.claimant.toLowerCase();
   const isRespondent = address?.toLowerCase() === caseData.respondent.toLowerCase();
   const isParty = isClaimant || isRespondent;
-  const now = Math.floor(Date.now() / 1000);
   const appealOpen = caseData.status === "RULING_ISSUED" && now <= (caseData.appealDeadlineTs ?? 0);
   const appealExpired = caseData.status === "RULING_ISSUED" && now > (caseData.appealDeadlineTs ?? 0);
 
