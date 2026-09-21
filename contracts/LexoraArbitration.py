@@ -1789,7 +1789,9 @@ class LexoraArbitration(gl.Contract):
             "evidenceRulesCommitment": agreement.evidence_rules_commitment,
             "permittedRemedies": json.loads(agreement.permitted_remedies_json),
             "maximumExposure": int(agreement.maximum_exposure),
+            "maximumExposureWei": str(int(agreement.maximum_exposure)),
             "requiredFunding": int(agreement.required_funding),
+            "requiredFundingWei": str(int(agreement.required_funding)),
             "acceptanceDeadlineTs": int(agreement.acceptance_deadline_ts),
             "performanceDeadlineTs": int(agreement.performance_deadline_ts),
             "disputeDeadlineTs": int(agreement.dispute_deadline_ts),
@@ -1826,7 +1828,8 @@ class LexoraArbitration(gl.Contract):
         return json.dumps({
             "disputeId": item.dispute_id, "agreementId": item.agreement_id,
             "state": item.state, "recipient": item.recipient,
-            "awardAmount": int(item.award_amount), "releasedAmount": int(item.released_amount),
+            "awardAmount": int(item.award_amount), "awardAmountWei": str(int(item.award_amount)),
+            "releasedAmount": int(item.released_amount), "releasedAmountWei": str(int(item.released_amount)),
             "preparedAt": int(item.prepared_at), "paidAt": int(item.paid_at),
         })
 
@@ -1837,12 +1840,19 @@ class LexoraArbitration(gl.Contract):
         return json.dumps({
             "agreementId": agreement_id,
             "totalDeposited": int(escrow.total_deposited),
+            "totalDepositedWei": str(int(escrow.total_deposited)),
             "available": int(escrow.available),
+            "availableWei": str(int(escrow.available)),
             "reserved": int(escrow.reserved),
+            "reservedWei": str(int(escrow.reserved)),
             "claimable": int(escrow.claimable),
+            "claimableWei": str(int(escrow.claimable)),
             "refundable": int(escrow.refundable),
+            "refundableWei": str(int(escrow.refundable)),
             "paid": int(escrow.paid),
+            "paidWei": str(int(escrow.paid)),
             "refunded": int(escrow.refunded),
+            "refundedWei": str(int(escrow.refunded)),
             "activeDisputeId": escrow.active_dispute_id,
         })
 
@@ -1897,6 +1907,7 @@ class LexoraArbitration(gl.Contract):
             "appealId":           case.appeal_id,
             "appealDeadlineTs":   int(case.appeal_deadline_ts),
             "reservedAmount":     int(case.reserved_amount),
+            "reservedAmountWei":  str(int(case.reserved_amount)),
             "settlementState":    case.settlement_state,
             "responseDeadlineTs": int(case.response_deadline_ts),
             "confidential":       case.confidential,
@@ -1954,6 +1965,7 @@ class LexoraArbitration(gl.Contract):
             "appealOutcome":     ruling.appeal_outcome,
             "liabilityBps":      int(ruling.liability_bps),
             "boundedAward":      int(ruling.bounded_award),
+            "boundedAwardWei":   str(int(ruling.bounded_award)),
             "createdAt":         int(ruling.created_at),
         })
 
