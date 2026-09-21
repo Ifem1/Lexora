@@ -15,7 +15,7 @@ function genToWei(value: string): bigint {
   const trimmed = value.trim();
   if (!/^\d+(\.\d{0,18})?$/.test(trimmed)) throw new Error("Enter a valid GEN amount with at most 18 decimals.");
   const [whole, fraction = ""] = trimmed.split(".");
-  return BigInt(whole) * 10n ** 18n + BigInt((fraction + "0".repeat(18)).slice(0, 18));
+  return BigInt(whole) * BigInt(10) ** BigInt(18) + BigInt((fraction + "0".repeat(18)).slice(0, 18));
 }
 
 export default function NewAgreementPage() {
