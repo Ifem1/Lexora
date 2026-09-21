@@ -76,17 +76,21 @@ export default function AgreementRoomPage() {
         <div>Counterparty: {agreement.counterparty}</div>
         <div>Funder: {agreement.funder}</div>
         <div>Framework: {agreement.frameworkId}</div>
-        <div>Maximum exposure: {agreement.maximumExposure} wei</div>
-        <div>Required funding: {agreement.requiredFunding} wei</div>
+        <div>Maximum exposure: {agreement.maximumExposureWei ?? String(agreement.maximumExposure)} wei</div>
+        <div>Required funding: {agreement.requiredFundingWei ?? String(agreement.requiredFunding)} wei</div>
         <div>Agreement commitment: <code>{agreement.commitment}</code></div>
       </div>
 
       {escrow && (
         <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
           {[
-            ["Deposited", escrow.totalDeposited], ["Available", escrow.available],
-            ["Reserved", escrow.reserved], ["Claimable", escrow.claimable],
-            ["Refundable", escrow.refundable], ["Paid", escrow.paid], ["Refunded", escrow.refunded],
+            ["Deposited", escrow.totalDepositedWei ?? String(escrow.totalDeposited)],
+            ["Available", escrow.availableWei ?? String(escrow.available)],
+            ["Reserved", escrow.reservedWei ?? String(escrow.reserved)],
+            ["Claimable", escrow.claimableWei ?? String(escrow.claimable)],
+            ["Refundable", escrow.refundableWei ?? String(escrow.refundable)],
+            ["Paid", escrow.paidWei ?? String(escrow.paid)],
+            ["Refunded", escrow.refundedWei ?? String(escrow.refunded)],
           ].map(([label, value]) => <div key={String(label)} style={{ padding: 12, border: "1px solid rgba(241,232,210,.1)" }}>{label}: {String(value)}</div>)}
         </div>
       )}
