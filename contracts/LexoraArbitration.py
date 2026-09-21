@@ -654,9 +654,9 @@ class LexoraArbitration(gl.Contract):
         }))
 
     def _check_status(self, case: ArbitrationCase, *allowed: str) -> None:
-        assert case.status in allowed, (
-            f"Action not permitted in status '{case.status}'. "
-            f"Allowed: {list(allowed)}"
+        self._require(
+            case.status in allowed,
+            f"Action not permitted in status '{case.status}'. Allowed: {list(allowed)}",
         )
 
     def _register_party_case(self, address: str, case_id: str) -> None:
@@ -686,8 +686,9 @@ class LexoraArbitration(gl.Contract):
         )
 
     def _check_framework(self, framework_id: str) -> None:
-        assert framework_id in VALID_FRAMEWORK_IDS, (
-            f"Unknown framework '{framework_id}'. Allowed: {VALID_FRAMEWORK_IDS}"
+        self._require(
+            framework_id in VALID_FRAMEWORK_IDS,
+            f"Unknown framework '{framework_id}'. Allowed: {VALID_FRAMEWORK_IDS}",
         )
 
     def _rulebook(self, framework_id: str) -> dict:
@@ -1149,8 +1150,9 @@ class LexoraArbitration(gl.Contract):
         self._require(isinstance(permitted, list) and len(permitted) > 0, "At least one permitted remedy is required.")
         for remedy in permitted:
             self._check_remedy(str(remedy))
-        assert "NO_ACTION" in [str(item) for item in permitted], (
-            "NO_ACTION must remain permitted for insufficient-evidence or procedural outcomes."
+        self._require(
+            "NO_ACTION" in [str(item) for item in permitted],
+            "NO_ACTION must remain permitted for insufficient-evidence or procedural outcomes.",
         )
 
         now = self._agreement_now()
