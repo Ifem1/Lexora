@@ -1,5 +1,9 @@
-import { createClient, chains, isSuccessful } from "genlayer-js";
-import { TransactionHashVariant } from "genlayer-js/types";
+import { createClient, chains } from "genlayer-js";
+import {
+  ExecutionResult,
+  TransactionHashVariant,
+  TransactionStatus,
+} from "genlayer-js/types";
 
 const configuredContractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 export const CONTRACT_ADDRESS = configuredContractAddress as `0x${string}` | undefined;
@@ -97,24 +101,27 @@ export async function waitForRuling(txHash: `0x${string}`): Promise<unknown> {
     hash: txHash as unknown as Parameters<
       typeof client.waitForTransactionReceipt
     >[0]["hash"],
-    waitUntil: "finalized",
+    status: TransactionStatus.FINALIZED,
     retries: 120,
     interval: 5000,
   });
 
-  if (!isSuccessful(receipt)) {
-    const normalized = receipt as {
-      statusName?: string;
-      status?: string | number;
-      txExecutionResultName?: string;
-      txExecutionResult?: string | number;
-      consensus_data?: {
-        leader_receipt?: Array<{
-          execution_result?: string;
-          genvm_result?: { stderr?: string };
-        }>;
-      };
+  const normalized = receipt as {
+    statusName?: string;
+    status?: string | number;
+    txExecutionResultName?: string;
+    txExecutionResult?: string | number;
+    consensus_data?: {
+      leader_receipt?: Array<{
+        execution_result?: string;
+        genvm_result?: { stderr?: string };
+      }>;
     };
+  };
+
+  if (
+    normalized.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN
+  ) {
     const detail =
       normalized.consensus_data?.leader_receipt?.[0]?.genvm_result?.stderr?.trim();
     const status = normalized.statusName ?? String(normalized.status ?? "UNKNOWN");

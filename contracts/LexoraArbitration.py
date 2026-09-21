@@ -5,6 +5,7 @@ from genlayer import *
 from dataclasses import dataclass
 import json
 import hashlib
+import time
 from urllib.parse import urlparse
 
 
@@ -522,7 +523,9 @@ class LexoraArbitration(gl.Contract):
         return self.escrows[agreement_id]
 
     def _agreement_now(self) -> u256:
-        return u256(int(gl.vm.get_timestamp().timestamp()))
+        # GenVM's standard-library clock is deterministically pinned to the
+        # transaction timestamp for every validator execution.
+        return u256(int(time.time()))
 
     def _assert_escrow_conservation(self, escrow: EscrowAccount) -> None:
         accounted = (
