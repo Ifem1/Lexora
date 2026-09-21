@@ -1124,6 +1124,9 @@ class LexoraArbitration(gl.Contract):
         assert isinstance(permitted, list) and len(permitted) > 0, "At least one permitted remedy is required."
         for remedy in permitted:
             self._check_remedy(str(remedy))
+        assert "NO_ACTION" in [str(item) for item in permitted], (
+            "NO_ACTION must remain permitted for insufficient-evidence or procedural outcomes."
+        )
 
         now = self._agreement_now()
         self.agreements[agreement_id] = Agreement(
@@ -1552,7 +1555,7 @@ class LexoraArbitration(gl.Contract):
 
         raw_json = gl.eq_principle.prompt_comparative(
             get_ruling_from_ai,
-            "outcome, remedy.action, and liabilityBps must be materially identical; monetary values are deterministically bounded by contract state.",
+            "The outcome, remedy.action, and liabilityBps fields must match exactly between validators; monetary values are deterministically bounded by contract state.",
         )
         ruling = self._parse_ruling(raw_json, case_id, ruling_id)
         self.rulings[ruling_id] = ruling
@@ -1738,6 +1741,33 @@ class LexoraArbitration(gl.Contract):
         completion path before this guard is removed.
         """
         assert False, "Runtime handoff: verify finalized outward GEN transfer success before claimable -> paid."
+
+    @gl.public.write
+    def prepare_funder_refund(self, agreement_id: str) -> None:
+        """Move unreserved funds to REFUNDABLE after the agreement dispute window."""
+        agreement = self._get_agreement(agreement_id)
+        escrow = self._get_escrow(agreement_id)
+        caller = str(gl.message.sender_address)
+        assert caller.lower() == agreement.funder.lower(), "Only the designated funder may prepare a refund."
+        assert escrow.active_dispute_id == "", "An unresolved dispute still controls this escrow."
+        assert int(self._agreement_now()) > int(agreement.dispute_deadline_ts), "Agreement dispute window is still open."
+        amount = int(escrow.available)
+        assert amount > 0, "No available escrow is refundable."
+        escrow.available = u256(0)
+        escrow.refundable = u256(int(escrow.refundable) + amount)
+        self._assert_escrow_conservation(escrow)
+        self.escrows[agreement_id] = escrow
+        self._emit_audit(agreement_id, "REFUND_READY", caller, f"value={amount}")
+
+    @gl.public.write
+    def execute_funder_refund(self, agreement_id: str) -> None:
+        """
+        Runtime handoff guard for REFUNDABLE -> REFUNDED.
+
+        Do not clear refundable value or increment historical refunded value until
+        the finalized outward GEN transfer is live-verified as successful.
+        """
+        assert False, "Runtime handoff: verify finalized outward GEN refund success before refundable -> refunded."
 
     # ── Public View Methods ────────────────────────────────────────────────────    # ── Public View Methods ────────────────────────────────────────────────────
 
@@ -2038,10 +2068,11 @@ class LexoraArbitration(gl.Contract):
         claim_submitted    = len(case.claim_hash) > 0
         response_submitted = len(case.response_hash) > 0
         evidence_anchored  = len(case.evidence_root) > 0
+        evidence_locked    = case.evidence_state == "EVIDENCE_LOCKED"
         status_ok          = case.status in ("SUBMISSIONS_OPEN", "RESPONSE_WINDOW")
         no_ruling_yet      = len(case.ruling_id) == 0
 
-        can_request = claim_submitted and status_ok and no_ruling_yet
+        can_request = claim_submitted and evidence_locked and status_ok and no_ruling_yet
 
         return json.dumps({
             "canRequest": can_request,
@@ -2049,6 +2080,7 @@ class LexoraArbitration(gl.Contract):
                 "claimSubmitted":    claim_submitted,
                 "responseSubmitted": response_submitted,
                 "evidenceAnchored":  evidence_anchored,
+                "evidenceLocked":    evidence_locked,
                 "statusPermits":     status_ok,
                 "noRulingYet":       no_ruling_yet,
             },
