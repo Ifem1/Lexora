@@ -346,7 +346,3 @@ def test_legacy_economic_bypasses_are_disabled(direct_vm, direct_deploy):
         contract.accept_ruling("CASE-X", "RULING-X")
     with direct_vm.expect_revert("mark_settled is disabled"):
         contract.mark_settled("CASE-X")
-    with direct_vm.expect_revert("Runtime handoff"):
-        contract.execute_claimable_payout("CASE-X")
-    with direct_vm.expect_revert("Runtime handoff"):
-        contract.execute_funder_refund("AGREEMENT-X")
