@@ -610,8 +610,8 @@ class LexoraArbitration(gl.Contract):
 
     def _prepare_settlement(self, case_id: str) -> None:
         case = self._get_case(case_id)
-        assert case.status == "FINAL_RULING", "A final ruling is required before settlement preparation."
         assert case.settlement_state == "NONE", "Settlement has already been prepared."
+        assert case.status == "FINAL_RULING", "A final ruling is required before settlement preparation."
         assert len(case.final_ruling_id) > 0, "Final ruling ID is missing."
 
         ruling = self._get_ruling(case.final_ruling_id)
