@@ -18,6 +18,11 @@ export function mapCaseFromChain(raw: string | Record<string, unknown>): Arbitra
 
   return {
     caseId: String(data.case_id ?? data.caseId ?? ""),
+    agreementId: data.agreement_id
+      ? String(data.agreement_id)
+      : data.agreementId
+      ? String(data.agreementId)
+      : undefined,
     title: String(data.title ?? "Untitled Case"),
     category: String(data.category ?? ""),
     claimant: String(data.claimant ?? ""),
@@ -35,13 +40,44 @@ export function mapCaseFromChain(raw: string | Record<string, unknown>): Arbitra
       : data.evidenceRoot
       ? String(data.evidenceRoot)
       : undefined,
+    evidenceState: data.evidence_state
+      ? String(data.evidence_state) as ArbitrationCase["evidenceState"]
+      : data.evidenceState
+      ? String(data.evidenceState) as ArbitrationCase["evidenceState"]
+      : undefined,
     rulingId: data.ruling_id
       ? String(data.ruling_id)
       : data.rulingId
       ? String(data.rulingId)
       : undefined,
-    createdAt: Number(data.created_at ?? data.createdAt ?? 0),
-    updatedAt: Number(data.updated_at ?? data.updatedAt ?? 0),
+    initialRulingId: data.initial_ruling_id
+      ? String(data.initial_ruling_id)
+      : data.initialRulingId
+      ? String(data.initialRulingId)
+      : undefined,
+    finalRulingId: data.final_ruling_id
+      ? String(data.final_ruling_id)
+      : data.finalRulingId
+      ? String(data.finalRulingId)
+      : undefined,
+    appealId: data.appeal_id
+      ? String(data.appeal_id)
+      : data.appealId
+      ? String(data.appealId)
+      : undefined,
+    appealDeadlineTs: Number(data.appeal_deadline_ts ?? data.appealDeadlineTs ?? 0),
+    reservedAmount: Number(data.reserved_amount ?? data.reservedAmount ?? 0),
+    settlementState: String(data.settlement_state ?? data.settlementState ?? "NONE"),
+    createdAt: Number(
+      data.created_at ??
+      data.createdAt ??
+      ((data.timestamps as Record<string, unknown> | undefined)?.createdAt ?? 0)
+    ),
+    updatedAt: Number(
+      data.updated_at ??
+      data.updatedAt ??
+      ((data.timestamps as Record<string, unknown> | undefined)?.updatedAt ?? 0)
+    ),
   };
 }
 
@@ -98,6 +134,8 @@ export function mapRulingFromChain(raw: string | Record<string, unknown>): Arbit
       ? ((data.procedural_warnings ?? data.proceduralWarnings) as unknown[]).map(String)
       : [],
     safetyBoundary: String(data.safety_boundary ?? data.safetyBoundary ?? ""),
+    liabilityBps: Number(data.liability_bps ?? data.liabilityBps ?? 0),
+    boundedAward: Number(data.bounded_award ?? data.boundedAward ?? 0),
     createdAt: Number(data.created_at ?? data.createdAt ?? 0),
   };
 }
@@ -111,8 +149,8 @@ const VALID_STATUSES: CaseStatus[] = [
   "RESPONSE_WINDOW",
   "UNDER_REVIEW",
   "RULING_ISSUED",
-  "ACCEPTED",
-  "APPEALED",
+  "FINAL_RULING",
+  "SETTLEMENT_READY",
   "SETTLED",
   "CANCELLED",
 ];
@@ -125,15 +163,14 @@ function normalizeStatus(raw: string): CaseStatus {
 const VALID_OUTCOMES: RulingOutcome[] = [
   "CLAIMANT_PREVAILS",
   "RESPONDENT_PREVAILS",
-  "PARTIAL_SETTLEMENT",
-  "RENEGOTIATE",
-  "MORE_EVIDENCE_REQUIRED",
-  "OUT_OF_SCOPE",
+  "PARTIAL",
+  "INSUFFICIENT_EVIDENCE",
+  "PROCEDURAL_FAILURE",
 ];
 
 export function normalizeRulingOutcome(outcome: string): RulingOutcome {
   const upper = outcome.toUpperCase() as RulingOutcome;
-  return VALID_OUTCOMES.includes(upper) ? upper : "MORE_EVIDENCE_REQUIRED";
+  return VALID_OUTCOMES.includes(upper) ? upper : "PROCEDURAL_FAILURE";
 }
 
 const VALID_REMEDY_ACTIONS: RemedyAction[] = [
