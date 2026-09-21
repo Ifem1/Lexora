@@ -11,7 +11,7 @@ function genToWei(value: string): bigint {
   const trimmed = value.trim();
   if (!/^\d+(\.\d{0,18})?$/.test(trimmed)) throw new Error("Enter a valid GEN amount with at most 18 decimals.");
   const [whole, fraction = ""] = trimmed.split(".");
-  return BigInt(whole) * 10n ** 18n + BigInt((fraction + "0".repeat(18)).slice(0, 18));
+  return BigInt(whole) * BigInt(10) ** BigInt(18) + BigInt((fraction + "0".repeat(18)).slice(0, 18));
 }
 
 async function sha256(value: string): Promise<string> {
@@ -144,7 +144,7 @@ export default function AgreementRoomPage() {
         </form>
       )}
 
-      {refundWindowOpen && availableWei > 0n && (
+      {refundWindowOpen && availableWei > BigInt(0) && (
         <section style={{ marginTop: 28 }}>
           <h2>Close unused escrow for refund</h2>
           <p>The dispute window has expired and no unresolved dispute controls these funds.</p>
@@ -154,7 +154,7 @@ export default function AgreementRoomPage() {
         </section>
       )}
 
-      {isFunder && refundableWei > 0n && (
+      {isFunder && refundableWei > BigInt(0) && (
         <section style={{ marginTop: 18 }}>
           <h2>Refundable escrow</h2>
           <p>{escrow?.refundableWei ?? String(escrow?.refundable ?? 0)} wei is refundable to the designated funder.</p>
