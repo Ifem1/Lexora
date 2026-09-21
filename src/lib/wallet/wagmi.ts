@@ -1,39 +1,30 @@
 import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { QueryClient } from "@tanstack/react-query";
-import { genLayerTestnet, genLayerLocalnet } from "@/lib/wallet/chains";
-
-// ─── TanStack Query Client ────────────────────────────────────────────────────
+import { genLayerStudionet, genLayerLocalnet } from "@/lib/wallet/chains";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Stale time of 30 seconds — appropriate for blockchain state
       staleTime: 30_000,
-      // Retry failed queries twice before surfacing the error
       retry: 2,
     },
   },
 });
 
-// ─── Wagmi Config ─────────────────────────────────────────────────────────────
-
 /**
- * Wagmi configuration for Lexora.
- *
- * Uses the injected connector (MetaMask, Rabby, etc.) and targets
- * GenLayer Testnet as the primary chain, with localnet as a fallback
- * for local development.
+ * Lexora targets stable GenLayer Studionet (chain 61999).
+ * Localnet (61127) remains available only for explicit local development.
  */
 export const wagmiConfig = createConfig({
-  chains: [genLayerTestnet, genLayerLocalnet],
+  chains: [genLayerStudionet, genLayerLocalnet],
   connectors: [
     injected({
       shimDisconnect: true,
     }),
   ],
   transports: {
-    [genLayerTestnet.id]: http("https://rpc.testnet.genlayer.com"),
+    [genLayerStudionet.id]: http("https://studio.genlayer.com/api"),
     [genLayerLocalnet.id]: http("http://localhost:4000/api"),
   },
   ssr: true,
