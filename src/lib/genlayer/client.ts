@@ -1,4 +1,5 @@
 import { createClient, chains } from "genlayer-js";
+import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 
 // ─── Contract Address ─────────────────────────────────────────────────────────
 
@@ -111,30 +112,40 @@ export async function writeContract(
 export async function waitForRuling(txHash: `0x${string}`): Promise<unknown> {
   const client = getGenLayerClient();
 
-  // Cast to Hash (branded type `{ length: 66 }`) as required by genlayer-js
   const receipt = await client.waitForTransactionReceipt({
     hash: txHash as unknown as Parameters<
       typeof client.waitForTransactionReceipt
     >[0]["hash"],
+    status: TransactionStatus.FINALIZED,
+    fullTransaction: false,
     retries: 120,
     interval: 5000,
   });
 
   const normalized = receipt as {
-    status?: string;
-    execution_status?: string;
+    txExecutionResultName?: string;
     consensus_data?: { leader_receipt?: Array<{
       execution_result?: string;
       genvm_result?: { stderr?: string };
     }> };
   };
+
+  if (normalized.txExecutionResultName === ExecutionResult.FINISHED_WITH_ERROR) {
+    const detail = normalized.consensus_data?.leader_receipt?.[0]?.genvm_result?.stderr?.trim();
+    throw new Error(detail || "The finalized GenLayer transaction failed contract execution.");
+  }
+  if (
+    normalized.txExecutionResultName &&
+    normalized.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN
+  ) {
+    throw new Error(`Unexpected finalized execution result: ${normalized.txExecutionResultName}`);
+  }
+
+  // Fallback for receipt shapes that still expose the leader result directly.
   const leaderReceipt = normalized.consensus_data?.leader_receipt?.[0];
   if (leaderReceipt?.execution_result === "ERROR") {
     const detail = leaderReceipt.genvm_result?.stderr?.trim();
-    throw new Error(detail || "The contract rejected this transaction.");
-  }
-  if (leaderReceipt?.execution_result && leaderReceipt.execution_result !== "SUCCESS") {
-    throw new Error(`Unexpected GenVM execution result: ${leaderReceipt.execution_result}`);
+    throw new Error(detail || "The contract rejected this finalized transaction.");
   }
 
   return receipt;
