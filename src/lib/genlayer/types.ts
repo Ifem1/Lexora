@@ -33,6 +33,7 @@ export type ArbitrationCase = {
   appealId?: string;
   appealDeadlineTs?: number;
   reservedAmount?: number;
+  reservedAmountWei?: string;
   settlementState?: string;
   createdAt: number;
   updatedAt: number;
@@ -137,6 +138,7 @@ export type ArbitrationRuling = {
   safetyBoundary: string;
   liabilityBps?: number;
   boundedAward?: number;
+  boundedAwardWei?: string;
   createdAt: number;
 };
 
@@ -163,7 +165,9 @@ export type Agreement = {
   title: string;
   permittedRemedies: RemedyAction[];
   maximumExposure: number;
+  maximumExposureWei?: string;
   requiredFunding: number;
+  requiredFundingWei?: string;
   acceptanceDeadlineTs: number;
   performanceDeadlineTs: number;
   disputeDeadlineTs: number;
@@ -177,12 +181,19 @@ export type Agreement = {
 export type EscrowAccount = {
   agreementId: string;
   totalDeposited: number;
+  totalDepositedWei?: string;
   available: number;
+  availableWei?: string;
   reserved: number;
+  reservedWei?: string;
   claimable: number;
+  claimableWei?: string;
   refundable: number;
+  refundableWei?: string;
   paid: number;
+  paidWei?: string;
   refunded: number;
+  refundedWei?: string;
   activeDisputeId: string;
 };
 
@@ -192,7 +203,9 @@ export type SettlementRecord = {
   state: string;
   recipient: string;
   awardAmount: number;
+  awardAmountWei?: string;
   releasedAmount: number;
+  releasedAmountWei?: string;
   preparedAt: number;
   paidAt: number;
 };
