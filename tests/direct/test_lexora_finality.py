@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from test_lexora_agreements import (
     CREATOR,
     COUNTERPARTY,
@@ -101,6 +102,7 @@ def test_invalid_duplicate_and_expired_appeal_paths_reject_before_consensus(dire
     case.appeal_id = ""
     case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
     contract.cases[case_id] = case
+    direct_vm.warp("2025-01-02T00:00:00Z")
     with pytest.raises(Exception, match="appeal window has expired"):
         contract.appeal_ruling(
             case_id,
@@ -167,21 +169,22 @@ def test_zero_award_settlement_can_finalize_without_outward_transfer(direct_vm, 
 
 
 def test_no_appeal_finalization_requires_expired_window(direct_vm, direct_deploy):
+    direct_vm.warp("2025-01-01T00:00:00Z")
     contract, case_id = setup_funded_dispute(direct_vm, direct_deploy)
     store_initial_ruling(contract, case_id, outcome="RESPONDENT_PREVAILS", bps=0, action="NO_ACTION")
 
     with pytest.raises(Exception, match="appeal window is still open"):
         contract.finalize_no_appeal(case_id)
 
-    case = contract._get_case(case_id)
-    case.appeal_deadline_ts = type(case.appeal_deadline_ts)(1)
-    contract.cases[case_id] = case
+    direct_vm.warp("2025-01-05T00:00:00Z")
     contract.finalize_no_appeal(case_id)
     case_json = json.loads(contract.get_case(case_id))
     assert case_json["finalRulingId"] == "RULING-TEST-INITIAL"
     assert case_json["status"] == "SETTLEMENT_READY"
 
+
 def test_available_funds_can_only_become_refundable_after_dispute_window(direct_vm, direct_deploy):
+    direct_vm.warp("2025-01-01T00:00:00Z")
     contract = direct_deploy("contracts/LexoraArbitration.py")
     direct_vm.sender = CREATOR
     propose(contract)
@@ -191,15 +194,12 @@ def test_available_funds_can_only_become_refundable_after_dispute_window(direct_
     with pytest.raises(Exception, match="dispute window is still open"):
         contract.prepare_funder_refund("AGREEMENT-001")
 
-    agreement = contract._get_agreement("AGREEMENT-001")
-    agreement.dispute_deadline_ts = type(agreement.dispute_deadline_ts)(1)
-    contract.agreements["AGREEMENT-001"] = agreement
+    direct_vm.warp("2025-03-01T00:00:00Z")
     contract.prepare_funder_refund("AGREEMENT-001")
     escrow = json.loads(contract.get_escrow("AGREEMENT-001"))
     assert escrow["available"] == 0
     assert escrow["refundable"] == 1000
     assert escrow["refunded"] == 0
 
-    # The external REFUNDABLE -> REFUNDED transfer is finalization-bound and
-    # remains a Studio/live verification step rather than a Direct Mode claim.
-
+    with pytest.raises(Exception, match="Runtime handoff"):
+        contract.execute_funder_refund("AGREEMENT-001")

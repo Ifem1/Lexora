@@ -523,13 +523,8 @@ class LexoraArbitration(gl.Contract):
         return self.escrows[agreement_id]
 
     def _agreement_now(self) -> u256:
-        # GenVM supplies this timestamp as part of deterministic transaction
-        # context; validators therefore agree on the exact same instant.
-        raw = str(gl.message_raw["datetime"])
-        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return u256(int(parsed.timestamp()))
+        # GenVM pins datetime.now() to the deterministic transaction timestamp.
+        return u256(int(datetime.now(timezone.utc).timestamp()))
 
     def _require(self, condition: bool, message: str) -> None:
         if not condition:
