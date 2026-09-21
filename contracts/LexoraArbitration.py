@@ -139,17 +139,15 @@ class RulingRemedy:
 class ArbitrationRuling:
     ruling_id: str
     case_id: str
-    outcome: str                   # CLAIMANT_PREVAILS | RESPONDENT_PREVAILS
-                                   # PARTIAL_SETTLEMENT | RENEGOTIATE
-                                   # MORE_EVIDENCE_REQUIRED | OUT_OF_SCOPE
+    outcome: str                   # CLAIMANT_PREVAILS | RESPONDENT_PREVAILS | PARTIAL
+                                   # INSUFFICIENT_EVIDENCE | PROCEDURAL_FAILURE
     confidence: u256               # 0-100
     remedy: RulingRemedy
     reasoning_summary: str
     procedural_warnings: str
     safety_boundary: str
     ruling_type: str               # INITIAL | APPEAL
-    appeal_outcome: str            # UPHOLD | REVISE | REQUEST_MORE_EVIDENCE
-                                   # PROCEDURAL_ERROR_FOUND | OUT_OF_SCOPE | NONE
+    appeal_outcome: str            # UPHOLD | REVISE | PROCEDURAL_FAILURE | NONE
     created_at: u256
     liability_bps: u256
     bounded_award: u256
@@ -202,7 +200,7 @@ VALID_APPEAL_GROUNDS = [
 APPEAL_WINDOW_SECONDS = 3 * 86400
 MAX_WEB_CONTENT_BYTES = 20000
 
-VALID_FRAMEWORK_IDS = [VALID_FRAMEWORK_IDS = [
+VALID_FRAMEWORK_IDS = [
     "freelance_milestone_delivery",
     "digital_service_refund",
     "marketplace_order_dispute",
