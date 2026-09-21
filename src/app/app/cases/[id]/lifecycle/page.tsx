@@ -87,7 +87,7 @@ export default function CaseLifecyclePage() {
         <div>Agreement: <strong>{caseData.agreementId}</strong></div>
         <div>Status: <strong>{caseData.status}</strong></div>
         <div>Evidence: <strong>{caseData.evidenceState ?? "EVIDENCE_OPEN"}</strong> ({evidenceCount} original / {appealEvidenceCount} appeal)</div>
-        <div>Reserved escrow: <strong>{caseData.reservedAmount ?? 0} wei</strong></div>
+        <div>Reserved escrow: <strong>{caseData.reservedAmountWei ?? String(caseData.reservedAmount ?? 0)} wei</strong></div>
         <div>Initial ruling: {caseData.initialRulingId || "—"}</div>
         <div>Final ruling: {caseData.finalRulingId || "—"}</div>
         <div>Settlement: {caseData.settlementState || "NONE"}</div>
@@ -179,14 +179,14 @@ export default function CaseLifecyclePage() {
           <h2>Settlement accounting</h2>
           <div>State: {settlement.state}</div>
           <div>Recipient: {settlement.recipient || "none"}</div>
-          <div>Award: {settlement.awardAmount} wei</div>
-          <div>Unused reservation released: {settlement.releasedAmount} wei</div>
-          {settlement.awardAmount === 0 && settlement.state === "READY" && (
+          <div>Award: {settlement.awardAmountWei ?? String(settlement.awardAmount)} wei</div>
+          <div>Unused reservation released: {settlement.releasedAmountWei ?? String(settlement.releasedAmount)} wei</div>
+          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) === 0n && settlement.state === "READY" && (
             <button onClick={() => run("settle zero award", () => finalizeZeroAwardSettlement(caseId))} style={{ marginTop: 12 }}>
               Finalize zero-award settlement
             </button>
           )}
-          {settlement.awardAmount > 0 && (
+          {BigInt(settlement.awardAmountWei ?? String(settlement.awardAmount)) > 0n && (
             <p style={{ marginTop: 12, opacity: 0.75 }}>
               Monetary award is claimable but not marked paid. Outward GEN transfer completion is intentionally reserved for the Codex/live runtime verification phase.
             </p>
