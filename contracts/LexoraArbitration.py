@@ -812,7 +812,7 @@ class LexoraArbitration(gl.Contract):
             f'{factors_block}\n\n'
 
             f'EXCLUDED MATTERS — if the dispute falls into these categories, '
-            f'return outcome OUT_OF_SCOPE:\n'
+            f'return PROCEDURAL_FAILURE with NO_ACTION and explain the scope issue:\n'
             f'{excluded_block}\n\n'
 
             f'ALLOWED OUTCOMES (use exactly one):\n'
@@ -1604,10 +1604,8 @@ class LexoraArbitration(gl.Contract):
 
     @gl.public.write
     def accept_ruling(self, case_id: str, ruling_id: str) -> None:
-        case = self._get_case(case_id)
-        if case.agreement_id:
-            assert False, "accept_ruling cannot bypass the appeal/finality/settlement lifecycle."
-        assert False, "Legacy acceptance writes are disabled."
+        # No write path may bypass the application appeal window or settlement accounting.
+        assert False, "accept_ruling cannot bypass the appeal/finality/settlement lifecycle."
 
     @gl.public.write
     def submit_appeal_evidence(
