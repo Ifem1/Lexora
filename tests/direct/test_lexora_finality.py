@@ -57,6 +57,10 @@ def test_appeal_evidence_is_separate_from_locked_original(direct_vm, direct_depl
         case_id, "CLAIMANT_EVIDENCE", "CONTRACT", "",
         "Original evidence", "0xoriginal",
     )
+
+    direct_vm.sender = COUNTERPARTY
+    contract.submit_response(case_id, "0xresponse", "")
+    direct_vm.sender = CREATOR
     contract.lock_evidence(case_id)
     original = json.loads(contract.get_case_evidence(case_id, False))
     original_root = json.loads(contract.get_case(case_id))["evidenceRoot"]
