@@ -27,6 +27,34 @@ class CaseTimestamps:
 
 @allow_storage
 @dataclass
+class Agreement:
+    agreement_id: str
+    version: u256
+    creator: str
+    counterparty: str
+    funder: str
+    framework_id: str
+    framework_version: str
+    title: str
+    description_commitment: str
+    obligation_commitment: str
+    acceptance_criteria_commitment: str
+    evidence_rules_commitment: str
+    permitted_remedies_json: str
+    maximum_exposure: u256
+    required_funding: u256
+    acceptance_deadline_ts: u256
+    performance_deadline_ts: u256
+    dispute_deadline_ts: u256
+    proposed_at: u256
+    accepted_at: u256
+    acceptance_state: str
+    lifecycle_state: str
+    commitment: str
+
+
+@allow_storage
+@dataclass
 class ArbitrationCase:
     case_id: str
     title: str
@@ -341,6 +369,7 @@ class LexoraArbitration(gl.Contract):
     # ── State Storage ──────────────────────────────────────────────────────────
 
     cases:          TreeMap[str, ArbitrationCase]
+    agreements:     TreeMap[str, Agreement]
     rulings:        TreeMap[str, ArbitrationRuling]
     audit_log:      TreeMap[str, AuditEvent]
     party_cases:    TreeMap[str, str]
@@ -348,6 +377,7 @@ class LexoraArbitration(gl.Contract):
     case_counter:   u256
     ruling_counter: u256
     audit_counter:  u256
+    agreement_counter: u256
 
     # ── Constructor ────────────────────────────────────────────────────────────
 
@@ -355,6 +385,7 @@ class LexoraArbitration(gl.Contract):
         self.case_counter   = u256(0)
         self.ruling_counter = u256(0)
         self.audit_counter  = u256(0)
+        self.agreement_counter = u256(0)
         self.stats = ProtocolStats(
             total_cases=u256(0),
             total_rulings=u256(0),
@@ -377,6 +408,10 @@ class LexoraArbitration(gl.Contract):
     def _next_case_id(self) -> str:
         self.case_counter = u256(int(self.case_counter) + 1)
         return f"CASE-{int(self.case_counter):06d}"
+
+    def _next_agreement_id(self) -> str:
+        self.agreement_counter = u256(int(self.agreement_counter) + 1)
+        return f"AGREEMENT-{int(self.agreement_counter):06d}"
 
     def _next_ruling_id(self) -> str:
         self.ruling_counter = u256(int(self.ruling_counter) + 1)
@@ -859,6 +894,144 @@ class LexoraArbitration(gl.Contract):
         )
 
     # ── Public Write Methods ───────────────────────────────────────────────────
+
+    @gl.public.write
+    def propose_agreement(
+        self,
+        agreement_id: str,
+        counterparty: str,
+        funder: str,
+        framework_id: str,
+        framework_version: str,
+        title: str,
+        description_commitment: str,
+        obligation_commitment: str,
+        acceptance_criteria_commitment: str,
+        evidence_rules_commitment: str,
+        permitted_remedies_json: str,
+        maximum_exposure: u256,
+        required_funding: u256,
+        acceptance_window_days: u256,
+        performance_window_days: u256,
+        dispute_window_days: u256,
+    ) -> str:
+        """Publish one immutable agreement version before any dispute exists."""
+        creator = str(gl.message.sender_address)
+        zero = "0x0000000000000000000000000000000000000000"
+        assert creator.lower() != zero, "Creator cannot be the zero address."
+        assert counterparty.lower() != zero, "Counterparty cannot be the zero address."
+        assert funder.lower() in (creator.lower(), counterparty.lower()), (
+            "Funder must be the creator or counterparty."
+        )
+
+    def _get_agreement(self, agreement_id: str) -> Agreement:
+        assert agreement_id in self.agreements, f"Agreement not found: {agreement_id}"
+        return self.agreements[agreement_id]
+
+    def _agreement_now(self) -> u256:
+        """Transaction time: deterministic in GenVM, unlike the legacy case clock."""
+        return u256(int(gl.vm.get_timestamp().timestamp()))
+
+    def _agreement_commitment(
+        self, agreement_id: str, counterparty: str, funder: str,
+        framework_id: str, framework_version: str, title: str,
+        description_commitment: str, obligation_commitment: str,
+        acceptance_criteria_commitment: str, evidence_rules_commitment: str,
+        permitted_remedies_json: str, maximum_exposure: u256,
+        required_funding: u256,
+    ) -> str:
+        values = [agreement_id, "1", counterparty, funder, framework_id,
+                  framework_version, title, description_commitment,
+                  obligation_commitment, acceptance_criteria_commitment,
+                  evidence_rules_commitment, permitted_remedies_json,
+                  maximum_exposure, required_funding]
+        canonical = "".join(self._frame_commitment_value(value) for value in values)
+        return "0x" + hashlib.sha256(canonical.encode()).hexdigest()
+        assert creator.lower() != counterparty.lower(), (
+            "Creator and counterparty cannot be identical."
+        )
+        assert agreement_id not in self.agreements, "Agreement ID already exists."
+        self._check_framework(framework_id)
+        assert len(framework_version) > 0, "Framework version is required."
+        assert len(title) >= 1, "Agreement title is required."
+        assert len(description_commitment) > 0, "Description commitment is required."
+        assert len(obligation_commitment) > 0, "Obligation commitment is required."
+        assert len(acceptance_criteria_commitment) > 0, "Acceptance criteria commitment is required."
+        assert len(evidence_rules_commitment) > 0, "Evidence rules commitment is required."
+        assert maximum_exposure > u256(0), "Maximum exposure must be positive."
+        assert required_funding > u256(0), "Required funding must be positive."
+        assert required_funding <= maximum_exposure, (
+            "Required funding cannot exceed maximum exposure."
+        )
+        assert acceptance_window_days >= u256(1), "Acceptance window must be positive."
+        assert performance_window_days >= u256(1), "Performance window must be positive."
+        assert dispute_window_days >= u256(1), "Dispute window must be positive."
+
+        now = self._agreement_now()
+        self.agreements[agreement_id] = Agreement(
+            agreement_id=agreement_id,
+            version=u256(1),
+            creator=creator,
+            counterparty=counterparty,
+            funder=funder,
+            framework_id=framework_id,
+            framework_version=framework_version,
+            title=title,
+            description_commitment=description_commitment,
+            obligation_commitment=obligation_commitment,
+            acceptance_criteria_commitment=acceptance_criteria_commitment,
+            evidence_rules_commitment=evidence_rules_commitment,
+            permitted_remedies_json=permitted_remedies_json,
+            maximum_exposure=maximum_exposure,
+            required_funding=required_funding,
+            acceptance_deadline_ts=u256(int(now) + int(acceptance_window_days) * 86400),
+            performance_deadline_ts=u256(int(now) + int(performance_window_days) * 86400),
+            dispute_deadline_ts=u256(int(now) + int(dispute_window_days) * 86400),
+            proposed_at=now,
+            accepted_at=u256(0),
+            acceptance_state="PROPOSED",
+            lifecycle_state="PROPOSED",
+            commitment=self._agreement_commitment(
+                agreement_id, counterparty, funder, framework_id, framework_version,
+                title, description_commitment, obligation_commitment,
+                acceptance_criteria_commitment, evidence_rules_commitment,
+                permitted_remedies_json, maximum_exposure, required_funding,
+            ),
+        )
+        self._emit_audit(agreement_id, "AGREEMENT_PROPOSED", creator, "version=1")
+        return agreement_id
+
+    @gl.public.write
+    def accept_agreement(self, agreement_id: str, version: u256, commitment: str) -> None:
+        agreement = self._get_agreement(agreement_id)
+        caller = str(gl.message.sender_address)
+        assert agreement.acceptance_state == "PROPOSED", "Agreement is not proposed."
+        assert caller.lower() == agreement.counterparty.lower(), "Only the counterparty may accept."
+        assert version == agreement.version, "Agreement version mismatch."
+        assert commitment == agreement.commitment, "Agreement commitment mismatch."
+        agreement.acceptance_state = "ACCEPTED"
+        agreement.lifecycle_state = "ACCEPTED_PENDING_FUNDING"
+        agreement.accepted_at = self._agreement_now()
+        self.agreements[agreement_id] = agreement
+        self._emit_audit(agreement_id, "AGREEMENT_ACCEPTED", caller, commitment)
+
+    @gl.public.write
+    def cancel_agreement(self, agreement_id: str) -> None:
+        agreement = self._get_agreement(agreement_id)
+        caller = str(gl.message.sender_address)
+        assert caller.lower() == agreement.creator.lower(), "Only the creator may cancel."
+        assert agreement.acceptance_state == "PROPOSED", "Accepted agreements cannot be cancelled here."
+        agreement.acceptance_state = "CANCELLED"
+        agreement.lifecycle_state = "CANCELLED"
+        self.agreements[agreement_id] = agreement
+        self._emit_audit(agreement_id, "AGREEMENT_CANCELLED", caller, "creator cancellation")
+
+    @gl.public.write
+    def activate_agreement(self, agreement_id: str) -> None:
+        """C2 guard: activation remains impossible until C3 funding is implemented."""
+        agreement = self._get_agreement(agreement_id)
+        assert agreement.lifecycle_state == "ACCEPTED_PENDING_FUNDING", "Agreement is not awaiting funding."
+        assert False, "Activation requires the C3 escrow implementation."
 
     @gl.public.write
     def create_case(
@@ -1393,6 +1566,54 @@ class LexoraArbitration(gl.Contract):
         )
 
     # ── Public View Methods ────────────────────────────────────────────────────
+
+    @gl.public.view
+    def get_agreement(self, agreement_id: str) -> str:
+        agreement = self._get_agreement(agreement_id)
+        return json.dumps({
+            "agreementId": agreement.agreement_id,
+            "version": int(agreement.version),
+            "creator": agreement.creator,
+            "counterparty": agreement.counterparty,
+            "funder": agreement.funder,
+            "frameworkId": agreement.framework_id,
+            "frameworkVersion": agreement.framework_version,
+            "title": agreement.title,
+            "descriptionCommitment": agreement.description_commitment,
+            "obligationCommitment": agreement.obligation_commitment,
+            "acceptanceCriteriaCommitment": agreement.acceptance_criteria_commitment,
+            "evidenceRulesCommitment": agreement.evidence_rules_commitment,
+            "permittedRemedies": json.loads(agreement.permitted_remedies_json),
+            "maximumExposure": int(agreement.maximum_exposure),
+            "requiredFunding": int(agreement.required_funding),
+            "acceptanceDeadlineTs": int(agreement.acceptance_deadline_ts),
+            "performanceDeadlineTs": int(agreement.performance_deadline_ts),
+            "disputeDeadlineTs": int(agreement.dispute_deadline_ts),
+            "proposedAt": int(agreement.proposed_at),
+            "acceptedAt": int(agreement.accepted_at),
+            "acceptanceState": agreement.acceptance_state,
+            "lifecycleState": agreement.lifecycle_state,
+            "commitment": agreement.commitment,
+        })
+
+    @gl.public.view
+    def get_agreement_state(self, agreement_id: str) -> str:
+        agreement = self._get_agreement(agreement_id)
+        return agreement.lifecycle_state
+
+    @gl.public.view
+    def get_agreement_acceptance(self, agreement_id: str) -> str:
+        agreement = self._get_agreement(agreement_id)
+        return agreement.acceptance_state
+
+    @gl.public.view
+    def get_agreement_commitment(self, agreement_id: str) -> str:
+        agreement = self._get_agreement(agreement_id)
+        return json.dumps({
+            "agreementId": agreement.agreement_id,
+            "version": int(agreement.version),
+            "commitment": agreement.commitment,
+        })
 
     @gl.public.view
     def get_case(self, case_id: str) -> str:
