@@ -386,6 +386,21 @@ export function useContract() {
     return writeContract(addr, "finalize_zero_award_settlement", [caseId], provider);
   }
 
+  async function executeClaimablePayout(caseId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "execute_claimable_payout", [caseId], provider);
+  }
+
+  async function prepareFunderRefund(agreementId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "prepare_funder_refund", [agreementId], provider);
+  }
+
+  async function executeFunderRefund(agreementId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "execute_funder_refund", [agreementId], provider);
+  }
+
   async function cancelCase(caseId: string): Promise<`0x${string}`> {
     const addr = requireAccount();
     return writeContract(addr, "cancel_case", [caseId], provider);
@@ -416,6 +431,9 @@ export function useContract() {
     submitAppealEvidence,
     finalizeNoAppeal,
     finalizeZeroAwardSettlement,
+    executeClaimablePayout,
+    prepareFunderRefund,
+    executeFunderRefund,
     cancelCase,
     markSettled,
     // read
