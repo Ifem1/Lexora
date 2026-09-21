@@ -8,6 +8,15 @@ import hashlib
 from urllib.parse import urlparse
 
 
+@gl.evm.contract_interface
+class _GenRecipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 # ─── Custom Storage Types ──────────────────────────────────────────────────────
 
 @allow_storage
@@ -64,6 +73,7 @@ class EscrowAccount:
     paid: u256
     refunded: u256
     active_dispute_id: str
+    refund_transfer_pending: bool
 
 
 @allow_storage
@@ -1162,7 +1172,7 @@ class LexoraArbitration(gl.Contract):
         self.escrows[agreement_id] = EscrowAccount(
             total_deposited=u256(0), available=u256(0), reserved=u256(0),
             claimable=u256(0), refundable=u256(0), paid=u256(0), refunded=u256(0),
-            active_dispute_id="",
+            active_dispute_id="", refund_transfer_pending=False,
         )
         self._emit_audit(agreement_id, "AGREEMENT_PROPOSED", creator, "version=1")
         return agreement_id
@@ -1733,14 +1743,37 @@ class LexoraArbitration(gl.Contract):
     @gl.public.write
     def execute_claimable_payout(self, case_id: str) -> None:
         """
-        Runtime handoff guard.
+        Schedule the claimable award as a finalization-bound external GEN transfer.
 
-        Current GenLayer supports finalized external GEN transfers to EOAs, but the
-        parent IC cannot safely mark PAID merely because it emitted that asynchronous
-        external message. Codex/live verification must wire a success-confirmed
-        completion path before this guard is removed.
+        The settlement is locked as TRANSFER_EMITTED to prevent replay. Accounting
+        intentionally remains CLAIMABLE rather than PAID because external messages
+        are asynchronous and this contract has no trustworthy synchronous success
+        return. Codex/live verification must prove the emitted transfer completed
+        before a later upgrade introduces CLAIMABLE -> PAID confirmation.
         """
-        assert False, "Runtime handoff: verify finalized outward GEN transfer success before claimable -> paid."
+        case = self._get_case(case_id)
+        assert case.status == "SETTLEMENT_READY", "Settlement is not ready."
+        assert case_id in self.settlements, "Settlement record is missing."
+        settlement = self.settlements[case_id]
+        assert settlement.state == "READY", "Payout has already been scheduled or settled."
+        amount = int(settlement.award_amount)
+        assert amount > 0, "Zero-award settlements do not need an outward transfer."
+        assert len(settlement.recipient) > 0, "Settlement recipient is missing."
+
+        escrow = self._get_escrow(case.agreement_id)
+        assert int(escrow.claimable) >= amount, "Claimable escrow is insufficient."
+        _GenRecipient(Address(settlement.recipient)).emit_transfer(value=u256(amount))
+
+        settlement.state = "TRANSFER_EMITTED"
+        self.settlements[case_id] = settlement
+        case.settlement_state = "TRANSFER_EMITTED"
+        case.timestamps.updated_at = self._agreement_now()
+        self.cases[case_id] = case
+        self._emit_audit(case_id, "PAYOUT_TRANSFER_EMITTED", str(gl.message.sender_address), json.dumps({
+            "recipient": settlement.recipient,
+            "value": amount,
+            "accounting": "CLAIMABLE_PENDING_LIVE_CONFIRMATION",
+        }))
 
     @gl.public.write
     def prepare_funder_refund(self, agreement_id: str) -> None:
@@ -1762,12 +1795,27 @@ class LexoraArbitration(gl.Contract):
     @gl.public.write
     def execute_funder_refund(self, agreement_id: str) -> None:
         """
-        Runtime handoff guard for REFUNDABLE -> REFUNDED.
+        Schedule REFUNDABLE value to the designated funder on finalization.
 
-        Do not clear refundable value or increment historical refunded value until
-        the finalized outward GEN transfer is live-verified as successful.
+        The refundable bucket remains unchanged until live confirmation because the
+        external message is asynchronous. refund_transfer_pending prevents replay.
         """
-        assert False, "Runtime handoff: verify finalized outward GEN refund success before refundable -> refunded."
+        agreement = self._get_agreement(agreement_id)
+        escrow = self._get_escrow(agreement_id)
+        caller = str(gl.message.sender_address)
+        assert caller.lower() == agreement.funder.lower(), "Only the designated funder may execute the refund."
+        assert not escrow.refund_transfer_pending, "Refund transfer has already been scheduled."
+        amount = int(escrow.refundable)
+        assert amount > 0, "No refundable escrow is available."
+
+        _GenRecipient(Address(agreement.funder)).emit_transfer(value=u256(amount))
+        escrow.refund_transfer_pending = True
+        self.escrows[agreement_id] = escrow
+        self._emit_audit(agreement_id, "REFUND_TRANSFER_EMITTED", caller, json.dumps({
+            "recipient": agreement.funder,
+            "value": amount,
+            "accounting": "REFUNDABLE_PENDING_LIVE_CONFIRMATION",
+        }))
 
     # ── Public View Methods ────────────────────────────────────────────────────    # ── Public View Methods ────────────────────────────────────────────────────
 
@@ -1854,6 +1902,7 @@ class LexoraArbitration(gl.Contract):
             "refunded": int(escrow.refunded),
             "refundedWei": str(int(escrow.refunded)),
             "activeDisputeId": escrow.active_dispute_id,
+            "refundTransferPending": escrow.refund_transfer_pending,
         })
 
     @gl.public.view
