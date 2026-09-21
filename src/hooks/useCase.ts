@@ -46,7 +46,7 @@ export function useCase(caseId: string) {
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    loadCase();
+    void Promise.resolve().then(loadCase);
   }, [loadCase]);
 
   return { caseData, ruling, canRule, loading, error, refresh: loadCase };
