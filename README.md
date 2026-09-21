@@ -2,7 +2,7 @@
 
 Lexora is an experimental GenLayer arbitration application built around **bilateral opt-in, native GEN escrow, validator-side evidence retrieval, one application-level appeal, and deterministic financial bounds**.
 
-This branch is the appeal upgrade. It is intentionally **not documented as deployed or live-verified yet**. The rebuilt contract must still pass local GenVM/Direct Mode checks, Studio execution, deployment, and live transfer verification before a new contract address is published.
+This branch is the appeal upgrade. The rebuilt contract is deployed on GenLayer Studionet (chain `61999`). Local Direct Mode verification is green; live escrow, ruling, appeal, and settlement flows remain subject to the runtime transaction checks documented below.
 
 ## Safety
 
@@ -157,7 +157,7 @@ The upgraded UI routes new activity through:
 
 The old `/app/cases/new` route redirects to agreement creation.
 
-The frontend reads the rebuilt contract address from configuration; there is no hardcoded replacement deployment.
+The frontend reads the rebuilt contract address from configuration and fails closed when it is absent.
 
 ## Environment
 
@@ -170,13 +170,13 @@ cp .env.example .env.local
 Required deployment configuration:
 
 ```env
-NEXT_PUBLIC_CONTRACT_ADDRESS=
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x06414f82D4D0a9859c513d720b65C02f817300a2
 NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 NEXT_PUBLIC_CHAIN_ID=61999
 NEXT_PUBLIC_DEV_MODE=true
 ```
 
-Leave `NEXT_PUBLIC_CONTRACT_ADDRESS` blank until Codex deploys and verifies the rebuilt contract. The frontend will fail closed instead of silently using an old address.
+The verified rebuilt deployment is `0x06414f82D4D0a9859c513d720b65C02f817300a2`. The legacy deployment must not be reused.
 
 ## Development
 
@@ -229,6 +229,14 @@ src/app/app/cases/[id]/lifecycle/page.tsx
 
 ## Deployment Status
 
-No new canonical appeal-upgrade contract address is published in this branch.
+The rebuilt contract is deployed on GenLayer Studionet (`61999`):
 
-Do not reuse the old deployment address for this rebuilt state model. After Codex completes local GenVM checks, Studio deployment, and live verification, set the genuine address in `NEXT_PUBLIC_CONTRACT_ADDRESS` and document the deployment transaction/source commit together.
+- Contract: `0x06414f82D4D0a9859c513d720b65C02f817300a2`
+- Deployment transaction: `0x729ca390d76e5f7c10b7a9210f12fe0362e2b0c5a3de33cdec6335df92b908ba`
+- RPC: `https://studio.genlayer.com/api`
+- Deployment source commit: `1a4c07a`
+- Deployment execution: `SUCCESS`
+- Consensus result: `MAJORITY_AGREE`
+- Explorer: [GenLayer Explorer](https://genlayer-explorer.vercel.app)
+
+The legacy deployment `0x8cC87a0fC2ffA4E0360F0a5b38B3B0F7a14D3952` must not be reused. Direct Mode is green (`16 passed`). Live payable funding, validator ruling, appeal, and final settlement transactions remain runtime verification work and are not claimed here without transaction evidence.
