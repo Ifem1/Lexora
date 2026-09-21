@@ -67,6 +67,7 @@ export function mapCaseFromChain(raw: string | Record<string, unknown>): Arbitra
       : undefined,
     appealDeadlineTs: Number(data.appeal_deadline_ts ?? data.appealDeadlineTs ?? 0),
     reservedAmount: Number(data.reserved_amount ?? data.reservedAmount ?? 0),
+    reservedAmountWei: data.reservedAmountWei ? String(data.reservedAmountWei) : undefined,
     settlementState: String(data.settlement_state ?? data.settlementState ?? "NONE"),
     createdAt: Number(
       data.created_at ??
@@ -136,6 +137,7 @@ export function mapRulingFromChain(raw: string | Record<string, unknown>): Arbit
     safetyBoundary: String(data.safety_boundary ?? data.safetyBoundary ?? ""),
     liabilityBps: Number(data.liability_bps ?? data.liabilityBps ?? 0),
     boundedAward: Number(data.bounded_award ?? data.boundedAward ?? 0),
+    boundedAwardWei: data.boundedAwardWei ? String(data.boundedAwardWei) : undefined,
     createdAt: Number(data.created_at ?? data.createdAt ?? 0),
   };
 }
