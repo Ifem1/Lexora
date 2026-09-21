@@ -117,7 +117,6 @@ export async function waitForRuling(txHash: `0x${string}`): Promise<unknown> {
       typeof client.waitForTransactionReceipt
     >[0]["hash"],
     status: TransactionStatus.FINALIZED,
-    fullTransaction: false,
     retries: 120,
     interval: 5000,
   });
