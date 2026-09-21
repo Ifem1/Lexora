@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ChevronRight, ChevronLeft, Check, FileText, BookOpen, Paperclip } from "lucide-react";
-import { cn } from "@/lib/utils/cn";
 import { motion, AnimatePresence } from "framer-motion";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
@@ -68,14 +67,13 @@ export default function CaseCreateForm({
 
   const schemas = [step1Schema, step2Schema, step3Schema];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<AllData>({
-    resolver: zodResolver(schemas[step]) as any,
+    resolver: zodResolver(schemas[step]) as never,
     defaultValues: { responseDeadlineDays: 7, ...accumulated } as AllData,
     mode: "onTouched",
   });
 
-  const { register, handleSubmit, formState: { errors }, getValues } = form;
+  const { register, handleSubmit, formState: { errors } } = form;
 
   const handleNext = handleSubmit((data) => {
     const merged = { ...accumulated, ...data };
