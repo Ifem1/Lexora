@@ -139,7 +139,7 @@ unused RESERVED → AVAILABLE
 
 For a zero award, the settlement can be finalized without an outbound transfer.
 
-**Runtime handoff:** the branch intentionally does not mark monetary value `PAID` or `REFUNDED` yet. Current GenLayer supports outward GEN transfers, but this GitHub-only phase does not prove the complete finalized-success callback/confirmation path needed to update those historical buckets safely. `execute_claimable_payout` and `execute_funder_refund` therefore remain guarded until Codex verifies and wires the smallest safe live-runtime completion path.
+**Runtime handoff:** current GenLayer external-message syntax is implemented for outward GEN. `execute_claimable_payout` and `execute_funder_refund` schedule EOA transfers that execute on parent finalization and lock replay. The branch intentionally does **not** move `CLAIMABLE → PAID` or `REFUNDABLE → REFUNDED` merely because the external message was emitted: those buckets remain pending until Codex/live verification proves the transfer-completion confirmation path and wires the smallest trustworthy accounting completion step.
 
 ## Frontend Flow
 
@@ -208,8 +208,8 @@ Network/Studio verification must separately prove:
 - web retrieval and multi-validator consensus behavior
 - transaction execution success rather than status alone
 - appeal timing/finality under the target network
-- outward claimable payout and funder refund success semantics
-- exact `CLAIMABLE → PAID` and `REFUNDABLE → REFUNDED` bookkeeping only after transfer success
+- finalization-bound EOA payout/refund messages and their triggered/external execution evidence
+- exact `CLAIMABLE → PAID` and `REFUNDABLE → REFUNDED` bookkeeping only after verified transfer success
 
 ## Key Files
 
