@@ -1220,7 +1220,13 @@ class LexoraArbitration(gl.Contract):
         self._require(caller.lower() == agreement.counterparty.lower(), "Only the counterparty may accept.")
         self._require(int(self._agreement_now()) <= int(agreement.acceptance_deadline_ts), "Agreement acceptance window has expired.")
         self._require(version == agreement.version, "Agreement version mismatch.")
-        self._require(commitment == agreement.commitment, "Agreement commitment mismatch.")
+        commitment_matches = commitment == agreement.commitment
+        if not commitment_matches:
+            try:
+                commitment_matches = int(commitment) == int(agreement.commitment, 16)
+            except (TypeError, ValueError):
+                commitment_matches = False
+        self._require(commitment_matches, "Agreement commitment mismatch.")
         agreement.acceptance_state = "ACCEPTED"
         agreement.lifecycle_state = "ACCEPTED_PENDING_FUNDING"
         agreement.accepted_at = self._agreement_now()

@@ -170,13 +170,13 @@ cp .env.example .env.local
 Required deployment configuration:
 
 ```env
-NEXT_PUBLIC_CONTRACT_ADDRESS=0x06414f82D4D0a9859c513d720b65C02f817300a2
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x30885E32315933ff936217bE4Db15a8789e51971
 NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 NEXT_PUBLIC_CHAIN_ID=61999
 NEXT_PUBLIC_DEV_MODE=true
 ```
 
-The verified rebuilt deployment is `0x06414f82D4D0a9859c513d720b65C02f817300a2`. The legacy deployment must not be reused.
+The verified rebuilt deployment is `0x30885E32315933ff936217bE4Db15a8789e51971`. The legacy deployment must not be reused.
 
 ## Development
 
@@ -231,8 +231,8 @@ src/app/app/cases/[id]/lifecycle/page.tsx
 
 The rebuilt contract is deployed on GenLayer Studionet (`61999`):
 
-- Contract: `0x06414f82D4D0a9859c513d720b65C02f817300a2`
-- Deployment transaction: `0x729ca390d76e5f7c10b7a9210f12fe0362e2b0c5a3de33cdec6335df92b908ba`
+- Contract: `0x30885E32315933ff936217bE4Db15a8789e51971`
+- Deployment transaction: `0xb52f42a760716605dd1793ec863c2aa62a23133166afa2e4cb569e616ab8002e`
 - RPC: `https://studio.genlayer.com/api`
 - Deployment source commit: `1a4c07a`
 - Deployment execution: `SUCCESS`
