@@ -239,4 +239,4 @@ The rebuilt contract is deployed on GenLayer Studionet (`61999`):
 - Consensus result: `MAJORITY_AGREE`
 - Explorer: [GenLayer Explorer](https://genlayer-explorer.vercel.app)
 
-The legacy deployment `0x8cC87a0fC2ffA4E0360F0a5b38B3B0F7a14D3952` must not be reused. Direct Mode is green (`16 passed`). Live payable funding, validator ruling, appeal, and final settlement transactions remain runtime verification work and are not claimed here without transaction evidence.
+The legacy deployment `0x8cC87a0fC2ffA4E0360F0a5b38B3B0F7a14D3952` must not be reused. Direct Mode is green (`16 passed`). Live payable funding, validator ruling, appeal, and zero-award settlement are documented in `docs/LIVE_VERIFICATION.md`. A positive-money `CLAIMABLE → PAID` transfer and `REFUNDABLE → REFUNDED` transfer remain unverified live limitations.
