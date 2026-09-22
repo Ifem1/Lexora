@@ -503,7 +503,7 @@ class LexoraArbitration(gl.Contract):
             event_type=event_type,
             actor=actor,
             data=data,
-            timestamp=self._tick(),
+            timestamp=self._agreement_now(),
         )
 
     def _get_case(self, case_id: str) -> ArbitrationCase:
@@ -1231,7 +1231,7 @@ class LexoraArbitration(gl.Contract):
         agreement.lifecycle_state = "ACCEPTED_PENDING_FUNDING"
         agreement.accepted_at = self._agreement_now()
         self.agreements[agreement_id] = agreement
-        self._emit_audit(agreement_id, "AGREEMENT_ACCEPTED", caller, commitment)
+        self._emit_audit(agreement_id, "AGREEMENT_ACCEPTED", caller, str(commitment))
 
     @gl.public.write
     def cancel_agreement(self, agreement_id: str) -> None:
