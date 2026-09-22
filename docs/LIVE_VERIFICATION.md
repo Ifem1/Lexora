@@ -36,3 +36,16 @@ The same agreement was then funded and disputed:
 ## Remaining live path
 
 The payable deposit was submitted directly through `genlayer-js` with a native `value` of `1 GEN`; no fake funding or synthetic state transition was used. A ruling was not requested for this case because the smoke-test claim commitments were deliberately simple labels rather than SHA-256 commitments of retained statements, and the contract correctly rejects a packet that cannot prove those bindings. Appeal and settlement therefore remain unclaimed for this agreement.
+
+## Follow-up attempt
+
+- Bad smoke-test cancellation: `0x91836c50a01b85c26d7836295446993fea447cc1db7b26ee9bb19a9e4d8482`
+- Replacement dispute: `CASE-000002`, transaction `0x76bbf2e128f3977acf1439637ad255bc7ce66137d0ae7fcab5341c7cd65a2e83`
+- Claim commitment: `0x7f5dc3b71655b44d9496a00f7f433b3f812c5623f8ac3fe8130979f874376151`
+- Response commitment: `0xb0f56c0cd5221bd93f94480d5163c501cabd1228c833b36020161f38e26b8a45`
+- Direct-SDK claim: `0x5beedab0dc3002c74de13b21807e94382c1b8a233bb661beabaec89e6cdf0e8c`
+- Direct-SDK response: `0xc307178a938b6ddd8ccac14aad7dee3f9522e6d31745af81c36b93cd3ff2579e`
+- Public evidence: `0x28ce0cd9715f017f0280b50af58ea6838367bab5f9b86258611615b2615f563e`
+- Respondent evidence direct-SDK attempt: `0xe37e4ba9064108cce4de0049d5ad41ace110896fc92411905b06b1f1d3393b0d`
+
+The replacement case reached `RESPONSE_WINDOW` with the correct claim and response commitments. Evidence locking was rejected because the second evidence submission was not yet reflected in the evidence snapshot; no ruling, appeal, or settlement is claimed.
