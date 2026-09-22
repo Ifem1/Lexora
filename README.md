@@ -139,7 +139,7 @@ unused RESERVED → AVAILABLE
 
 For a zero award, the settlement can be finalized without an outbound transfer.
 
-**Runtime handoff:** current GenLayer external-message syntax is implemented for outward GEN. `execute_claimable_payout` and `execute_funder_refund` schedule EOA transfers that execute on parent finalization and lock replay. The branch intentionally does **not** move `CLAIMABLE → PAID` or `REFUNDABLE → REFUNDED` merely because the external message was emitted: those buckets remain pending until Codex/live verification proves the transfer-completion confirmation path and wires the smallest trustworthy accounting completion step.
+**Runtime status:** current GenLayer external-message syntax is implemented for outward GEN. `execute_claimable_payout` and `execute_funder_refund` schedule EOA transfers on parent finalization. The live verification record is maintained in [`docs/LIVE_VERIFICATION.md`](docs/LIVE_VERIFICATION.md); it does not claim payout or refund completion without a real payable funding transaction and corresponding transfer evidence.
 
 ## Frontend Flow
 
