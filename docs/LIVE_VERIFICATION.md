@@ -37,7 +37,7 @@ The same agreement was then funded and disputed:
 
 The payable deposit was submitted directly through `genlayer-js` with a native `value` of `1 GEN`; no fake funding or synthetic state transition was used. A ruling was not requested for this case because the smoke-test claim commitments were deliberately simple labels rather than SHA-256 commitments of retained statements, and the contract correctly rejects a packet that cannot prove those bindings. Appeal and settlement therefore remain unclaimed for this agreement.
 
-## Follow-up attempt
+## Complete replacement-case verification
 
 - Bad smoke-test cancellation: `0x91836c50a01b85c26d7836295446993fea447cc1db7b26ee9bb19a9e4d8482`
 - Replacement dispute: `CASE-000002`, transaction `0x76bbf2e128f3977acf1439637ad255bc7ce66137d0ae7fcab5341c7cd65a2e83`
@@ -48,4 +48,46 @@ The payable deposit was submitted directly through `genlayer-js` with a native `
 - Public evidence: `0x28ce0cd9715f017f0280b50af58ea6838367bab5f9b86258611615b2615f563e`
 - Respondent evidence direct-SDK attempt: `0xe37e4ba9064108cce4de0049d5ad41ace110896fc92411905b06b1f1d3393b0d`
 
-The replacement case reached `RESPONSE_WINDOW` with the correct claim and response commitments. Evidence locking was rejected because the second evidence submission was not yet reflected in the evidence snapshot; no ruling, appeal, or settlement is claimed.
+The respondent-evidence transaction finalized but its GenVM execution failed with the exact contract error `Original evidence is locked.` It returned no evidence ID, and `get_case_evidence("CASE-000002")` contains only `EVIDENCE-000002` from the claimant-side public source. This was not resent blindly because the evidence lock had already succeeded.
+
+The separately rejected lock transaction `0xe553609dfe4a80c237e09deda6a8bcbb6736a2149c44bb7766842a5022619c13` also finalized with a GenVM execution error: `Evidence is already locked.` The successful one-time lock was:
+
+- Evidence lock: `0x2ddf072a1298def8e2a2b900f76a3b3b29842df193f3155212b68feb8a0003b5`
+- Readback: `evidenceState=EVIDENCE_LOCKED`
+- Final evidence root: `0xaa9544627ff6416ec2befd049c9ffbabb7ccd8590bedcad22955127baf59063d`
+- Final snapshot: `EVIDENCE-000002` only
+
+The ruling packet used the exact retained statements and commitments:
+
+- Claim: `The claimant delivered the agreed milestone before the deadline.`
+- Claim SHA-256: `0x7f5dc3b71655b44d9496a00f7f433b3f812c5623f8ac3fe8130979f874376151`
+- Response: `The respondent disputes completion and requests no payment.`
+- Response SHA-256: `0xb0f56c0cd5221bd93f94480d5163c501cabd1228c833b36020161f38e26b8a45`
+- Packet evidence root: `0xaa9544627ff6416ec2befd049c9ffbabb7ccd8590bedcad22955127baf59063d`
+- Packet commitment: `0xd2b9c6e37739bfeeac794be2c93b15e60be050cb6994be56e9723b81962c9363`
+
+The real initial ruling was requested with `request_ruling`:
+
+- Ruling transaction: `0x2d35405572edb33912939fa159d9ee6b9dbdf6a286e4a3dcf5fc1f3c2979f849`
+- Receipt: `FINALIZED`; leader execution: `SUCCESS` / `FINISHED_WITH_RETURN` equivalent; consensus: `MAJORITY_AGREE`
+- Returned ruling ID: `RULING-000001`
+- Outcome: `INSUFFICIENT_EVIDENCE`; remedy: `NO_ACTION`; liability: `0` basis points; bounded award: `0`
+- Retrieval result: the validator ruling reported the submitted public page as unrelated to the dispute; the deployed getter exposes the resulting evidence map, not a separate retrieval-status field.
+
+One legitimate application appeal was then executed using `MATERIAL_AGREEMENT_MISAPPLICATION`:
+
+- Appeal transaction: `0xba7c96dbb326e3d4f9f3539c6a6b498c2110ef289ded7298aedfdb7b62430f72`
+- Receipt: `FINALIZED`; leader execution: `SUCCESS` / `FINISHED_WITH_RETURN` equivalent; consensus: `MAJORITY_AGREE`
+- Returned final ruling ID: `RULING-000002`
+- Final outcome: `INSUFFICIENT_EVIDENCE`; appeal outcome: `UPHOLD`
+- Final remedy/liability/award: `NO_ACTION` / `0` bps / `0`
+- The original ruling ID and locked evidence root remained unchanged; no second appeal was permitted.
+
+The zero-award settlement path was completed without an outbound transfer:
+
+- Settlement transaction: `0x4f9e270869cc2332cf674e599e4e66d47b52293ea1001e696a3b621a3c782db2`
+- Receipt: finalized (`status=7` in the direct SDK receipt) with leader execution `SUCCESS`
+- Final case state: `SETTLED`; settlement state: `SETTLED`
+- Final accounting: `totalDeposited=1 GEN`, `available=1 GEN`, `reserved=0`, `claimable=0`, `refundable=0`, `paid=0`, `refunded=0`
+- Reservation release: `RESERVED → AVAILABLE`; no payout was appropriate because the legitimate final award was zero.
+- Conservation: `totalDeposited = available + reserved + claimable + refundable + paid + refunded` = `1 GEN`.

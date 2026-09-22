@@ -234,7 +234,7 @@ The rebuilt contract is deployed on GenLayer Studionet (`61999`):
 - Contract: `0xC3F43D4C691ABcbd014836Cd29AD1D10f04c623A`
 - Deployment transaction: `0x63e6dd8c8efa71570f7b277a93ec18bb7fa00a3a02e60a52d1e6107f660067f5`
 - RPC: `https://studio.genlayer.com/api`
-- Deployment source commit: `1a4c07a`
+- Deployment source commit: `5ccd2b4e75f8e0d8d70ee6c64bd4a9358efda6da`
 - Deployment execution: `SUCCESS`
 - Consensus result: `MAJORITY_AGREE`
 - Explorer: [GenLayer Explorer](https://genlayer-explorer.vercel.app)
