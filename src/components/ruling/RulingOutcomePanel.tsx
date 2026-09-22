@@ -16,46 +16,24 @@ const OUTCOME_CONFIG: Record<
   { label: string; color: string; bg: string; border: string; description: string }
 > = {
   CLAIMANT_PREVAILS: {
-    label: "Claimant Prevails",
-    color: "#6B8FB3",
-    bg: "rgba(107,143,179,0.08)",
-    border: "rgba(107,143,179,0.25)",
-    description: "The arbitration panel found in favour of the claimant.",
+    label: "Claimant Prevails", color: "#6B8FB3", bg: "rgba(107,143,179,0.08)",
+    border: "rgba(107,143,179,0.25)", description: "The ruling found for the claimant within the accepted agreement bounds.",
   },
   RESPONDENT_PREVAILS: {
-    label: "Respondent Prevails",
-    color: "#A94343",
-    bg: "rgba(169,67,67,0.08)",
-    border: "rgba(169,67,67,0.25)",
-    description: "The arbitration panel found in favour of the respondent.",
+    label: "Respondent Prevails", color: "#A94343", bg: "rgba(169,67,67,0.08)",
+    border: "rgba(169,67,67,0.25)", description: "The ruling found for the respondent.",
   },
-  PARTIAL_SETTLEMENT: {
-    label: "Partial Settlement",
-    color: "#C58B3B",
-    bg: "rgba(197,139,59,0.08)",
-    border: "rgba(197,139,59,0.25)",
-    description: "The panel recommends a partial settlement between parties.",
+  PARTIAL: {
+    label: "Partial", color: "#C58B3B", bg: "rgba(197,139,59,0.08)",
+    border: "rgba(197,139,59,0.25)", description: "Responsibility or relief was only partially established.",
   },
-  RENEGOTIATE: {
-    label: "Renegotiate",
-    color: "#C69C5D",
-    bg: "rgba(198,156,93,0.08)",
-    border: "rgba(198,156,93,0.2)",
-    description: "The panel recommends renegotiation of the disputed terms.",
+  INSUFFICIENT_EVIDENCE: {
+    label: "Insufficient Evidence", color: "#C69C5D", bg: "rgba(198,156,93,0.08)",
+    border: "rgba(198,156,93,0.2)", description: "The locked evidence was insufficient for a claimant award.",
   },
-  MORE_EVIDENCE_REQUIRED: {
-    label: "More Evidence Required",
-    color: "#C58B3B",
-    bg: "rgba(197,139,59,0.06)",
-    border: "rgba(197,139,59,0.2)",
-    description: "Insufficient evidence to issue a definitive ruling.",
-  },
-  OUT_OF_SCOPE: {
-    label: "Out of Scope",
-    color: "rgba(241,232,210,0.45)",
-    bg: "rgba(241,232,210,0.04)",
-    border: "rgba(241,232,210,0.12)",
-    description: "This matter falls outside the selected arbitration framework.",
+  PROCEDURAL_FAILURE: {
+    label: "Procedural Failure", color: "rgba(241,232,210,0.55)", bg: "rgba(241,232,210,0.04)",
+    border: "rgba(241,232,210,0.12)", description: "The dispute could not produce an enforceable outcome because the procedure materially failed.",
   },
 };
 

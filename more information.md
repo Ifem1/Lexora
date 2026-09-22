@@ -91,8 +91,6 @@ The valid ruling reached `RULING_ISSUED` with outcome `CLAIMANT_PREVAILS` and co
 
 ## Deployed contract
 
-The application is wired to the fully corrected Studionet contract:
+The application is wired to the current corrected Studionet contract. The earlier address below is retained only as historical context and must not be used:
 
-`0x8cC87a0fC2ffA4E0360F0a5b38B3B0F7a14D3952`
-
-This replacement address is required because intelligent-contract code is immutable and the complete packet-binding checks were added after the earlier deployment.
+`0x8cC87a0fC2ffA4E0360F0a5b38B3B0F7a14D3952` (legacy; do not reuse)

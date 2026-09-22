@@ -1,14 +1,14 @@
 import { defineChain } from "viem";
 
 /**
- * GenLayer Testnet (Bradbury) chain configuration for viem/wagmi.
+ * Stable GenLayer Studionet used by the rebuilt Lexora deployment.
  *
- * Chain ID: 961
- * The authoritative chain definition from genlayer-js uses this config.
+ * Chain ID: 61999
+ * RPC: https://studio.genlayer.com/api
  */
-export const genLayerTestnet = defineChain({
-  id: 961,
-  name: "GenLayer Testnet",
+export const genLayerStudionet = defineChain({
+  id: 61999,
+  name: "GenLayer Studionet",
   nativeCurrency: {
     name: "GEN",
     symbol: "GEN",
@@ -16,24 +16,25 @@ export const genLayerTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ["https://rpc.testnet.genlayer.com"],
+      http: ["https://studio.genlayer.com/api"],
     },
   },
   blockExplorers: {
     default: {
-      name: "GenLayer Explorer",
-      url: "https://explorer.testnet.genlayer.com",
+      name: "GenLayer Studio Explorer",
+      url: "https://explorer-studio.genlayer.com",
     },
   },
   testnet: true,
 });
 
 /**
- * GenLayer Localnet chain configuration for local development.
- * Connects to a locally running GenLayer node.
+ * GenLayer Localnet for an explicitly local Studio/GLSim instance.
+ *
+ * Chain ID: 61127
  */
 export const genLayerLocalnet = defineChain({
-  id: 61999,
+  id: 61127,
   name: "GenLayer Localnet",
   nativeCurrency: {
     name: "GEN",

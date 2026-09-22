@@ -1,0 +1,59 @@
+name: Lexora Studionet probe
+
+on:
+  push:
+    branches:
+      - lexora/appeal-upgrade
+    paths:
+      - .github/workflows/lexora-studionet-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Verify stable Studionet and faucet
+        env:
+          STUDIONET_RPC: https://studio.genlayer.com/api
+        run: |
+          python -m pip install "genlayer-py==0.16.3" requests
+          python - <<'PY'
+          import os, requests
+          from genlayer_py import create_account
+
+          rpc=os.environ["STUDIONET_RPC"]
+          account=create_account()
+          address=account.address
+
+          def call(method, params):
+              response=requests.post(rpc, json={"jsonrpc":"2.0","id":1,"method":method,"params":params}, timeout=30)
+              response.raise_for_status()
+              payload=response.json()
+              if "error" in payload:
+                  raise RuntimeError(f"{method}: {payload['error']}")
+              return payload["result"]
+
+          chain_id=int(call("eth_chainId", []), 16)
+          if chain_id != 61999:
+              raise RuntimeError(f"Refusing non-Studionet chain id {chain_id}")
+
+          before=int(call("eth_getBalance", [address, "latest"]), 16)
+          fund_amount=20 * 10**18
+          faucet_tx=call("sim_fundAccount", [address, fund_amount])
+          after=int(call("eth_getBalance", [address, "latest"]), 16)
+
+          if after < before + fund_amount:
+              raise RuntimeError(f"Faucet did not credit expected GEN: before={before} after={after}")
+
+          print(f"CHAIN_ID={chain_id}")
+          print(f"EPHEMERAL_ADDRESS={address}")
+          print(f"FAUCET_TX={faucet_tx}")
+          print(f"BALANCE_BEFORE_WEI={before}")
+          print(f"BALANCE_AFTER_WEI={after}")
+          PY

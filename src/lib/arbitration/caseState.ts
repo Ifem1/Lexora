@@ -8,9 +8,11 @@ const STATUS_TRANSITIONS: Record<CaseStatus, CaseStatus | null> = {
   SUBMISSIONS_OPEN: "RESPONSE_WINDOW",
   RESPONSE_WINDOW: "UNDER_REVIEW",
   UNDER_REVIEW: "RULING_ISSUED",
-  RULING_ISSUED: "ACCEPTED",
+  RULING_ISSUED: "FINAL_RULING",
   ACCEPTED: null,
-  APPEALED: "UNDER_REVIEW",
+  APPEALED: "FINAL_RULING",
+  FINAL_RULING: "SETTLEMENT_READY",
+  SETTLEMENT_READY: "SETTLED",
   SETTLED: null,
   CANCELLED: null,
 };
@@ -32,7 +34,9 @@ export const STATUS_FLOW: CaseStatus[] = [
   "RESPONSE_WINDOW",
   "UNDER_REVIEW",
   "RULING_ISSUED",
-  "ACCEPTED",
+  "FINAL_RULING",
+  "SETTLEMENT_READY",
+  "SETTLED",
 ];
 
 /**
@@ -68,6 +72,8 @@ export function getStatusLabel(status: CaseStatus): string {
     RULING_ISSUED: "Ruling Issued",
     ACCEPTED: "Accepted",
     APPEALED: "Appealed",
+    FINAL_RULING: "Final Ruling",
+    SETTLEMENT_READY: "Settlement Ready",
     SETTLED: "Settled",
     CANCELLED: "Cancelled",
   };
@@ -87,6 +93,8 @@ export function getStatusColor(status: CaseStatus): string {
     RULING_ISSUED: "bg-emerald-900/50 text-emerald-300",
     ACCEPTED: "bg-green-900/50 text-green-300",
     APPEALED: "bg-orange-900/50 text-orange-300",
+    FINAL_RULING: "bg-cyan-900/50 text-cyan-300",
+    SETTLEMENT_READY: "bg-teal-900/50 text-teal-300",
     SETTLED: "bg-teal-900/50 text-teal-300",
     CANCELLED: "bg-red-900/50 text-red-400",
   };

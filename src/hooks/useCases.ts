@@ -39,7 +39,7 @@ export function useCases() {
   }, [address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    loadCases();
+    void Promise.resolve().then(loadCases);
   }, [loadCases]);
 
   return { cases, loading, error, refresh: loadCases };

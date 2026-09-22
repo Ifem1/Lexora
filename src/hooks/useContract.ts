@@ -8,6 +8,10 @@ import type {
   ArbitrationCase,
   ArbitrationRuling,
   ArbitrationFramework,
+  Agreement,
+  EscrowAccount,
+  SettlementRecord,
+  EvidencePacket,
 } from "@/lib/genlayer/types";
 
 // ─── Protocol Stats Type ──────────────────────────────────────────────────────
@@ -49,6 +53,47 @@ export function useContract() {
   }
 
   // ── Read methods ──────────────────────────────────────────────────────────
+
+  async function getAgreement(agreementId: string): Promise<Agreement | null> {
+    try {
+      const raw = await readContract("get_agreement", [agreementId]);
+      return raw ? parseJsonResult<Agreement>(raw) : null;
+    } catch (err) {
+      console.error("[useContract] getAgreement failed:", err);
+      return null;
+    }
+  }
+
+  async function getEscrow(agreementId: string): Promise<EscrowAccount | null> {
+    try {
+      const raw = await readContract("get_escrow", [agreementId]);
+      return raw ? parseJsonResult<EscrowAccount>(raw) : null;
+    } catch (err) {
+      console.error("[useContract] getEscrow failed:", err);
+      return null;
+    }
+  }
+
+  async function getSettlement(caseId: string): Promise<SettlementRecord | null> {
+    try {
+      const raw = await readContract("get_settlement", [caseId]);
+      return raw ? parseJsonResult<SettlementRecord>(raw) : null;
+    } catch (err) {
+      console.error("[useContract] getSettlement failed:", err);
+      return null;
+    }
+  }
+
+  async function getCaseEvidence(caseId: string, appeal = false): Promise<EvidencePacket[]> {
+    try {
+      const raw = await readContract("get_case_evidence", [caseId, appeal]);
+      const parsed = raw ? parseJsonResult<EvidencePacket[]>(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error("[useContract] getCaseEvidence failed:", err);
+      return [];
+    }
+  }
 
   async function getCase(caseId: string): Promise<ArbitrationCase | null> {
     try {
@@ -150,31 +195,89 @@ export function useContract() {
 
   // ── Write methods ─────────────────────────────────────────────────────────
 
-  async function createCase(params: {
+  async function proposeAgreement(params: {
+    agreementId: string;
+    counterparty: string;
+    funder: string;
+    frameworkId: string;
+    frameworkVersion: string;
+    title: string;
+    descriptionCommitment: string;
+    obligationCommitment: string;
+    acceptanceCriteriaCommitment: string;
+    evidenceRulesCommitment: string;
+    permittedRemedies: string[];
+    maximumExposure: bigint;
+    requiredFunding: bigint;
+    acceptanceWindowDays: number;
+    performanceWindowDays: number;
+    disputeWindowDays: number;
+  }): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "propose_agreement", [
+      params.agreementId,
+      params.counterparty,
+      params.funder,
+      params.frameworkId,
+      params.frameworkVersion,
+      params.title,
+      params.descriptionCommitment,
+      params.obligationCommitment,
+      params.acceptanceCriteriaCommitment,
+      params.evidenceRulesCommitment,
+      JSON.stringify(params.permittedRemedies),
+      params.maximumExposure,
+      params.requiredFunding,
+      params.acceptanceWindowDays,
+      params.performanceWindowDays,
+      params.disputeWindowDays,
+    ], provider);
+  }
+
+  async function acceptAgreement(
+    agreementId: string,
+    version: number,
+    commitment: string
+  ): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "accept_agreement", [agreementId, version, commitment], provider);
+  }
+
+  async function cancelAgreement(agreementId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "cancel_agreement", [agreementId], provider);
+  }
+
+  async function depositEscrow(
+    agreementId: string,
+    valueWei: bigint
+  ): Promise<`0x${string}`> {
+    if (valueWei <= BigInt(0)) throw new Error("Escrow funding value must be positive.");
+    const addr = requireAccount();
+    return writeContract(addr, "deposit_escrow", [agreementId], provider, valueWei);
+  }
+
+  async function openDispute(params: {
+    agreementId: string;
+    caseManifestHash: string;
     title: string;
     category: string;
-    respondent: string;
-    frameworkId: string;
-    claimSummary: string;
-    requestedRemedy: string;
     responseDeadlineDays?: number;
-  }): Promise<{ txHash: `0x${string}`; caseId?: string }> {
+    confidential?: boolean;
+  }): Promise<`0x${string}`> {
     const addr = requireAccount();
-    // Contract signature: create_case(framework_id, case_manifest_hash, title, category, party_b, response_deadline_days, confidential)
-    const manifestHash = `0x${Array.from(
-      new TextEncoder().encode(params.title + params.claimSummary)
-    ).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 64)}`;
-
-    const txHash = await writeContract(addr, "create_case", [
-      params.frameworkId,
-      manifestHash,
+    return writeContract(addr, "open_dispute", [
+      params.agreementId,
+      params.caseManifestHash,
       params.title,
       params.category,
-      params.respondent,
       params.responseDeadlineDays ?? 7,
-      false,
+      params.confidential ?? false,
     ], provider);
-    return { txHash };
+  }
+
+  async function createCase(): Promise<{ txHash: `0x${string}`; caseId?: string }> {
+    throw new Error("Legacy case creation is disabled. Create and fund an agreement, then open a dispute.");
   }
 
   async function submitClaim(params: {
@@ -208,18 +311,32 @@ export function useContract() {
     ], provider);
   }
 
-  async function submitEvidence(params: {
+  async function submitEvidenceRecord(params: {
     caseId: string;
-    evidenceManifestHash: string;
-    evidenceRoot: string;
+    evidenceClass: "CLAIMANT_EVIDENCE" | "RESPONDENT_EVIDENCE" | "COUNTER_EVIDENCE" | "AGREEMENT_NATIVE" | "PUBLIC_WEB";
+    evidenceType: string;
+    sourceUrl?: string;
+    description: string;
+    commitment: string;
   }): Promise<`0x${string}`> {
     const addr = requireAccount();
-    // Contract: submit_evidence(case_id, evidence_manifest_hash, evidence_root)
-    return writeContract(addr, "submit_evidence", [
+    return writeContract(addr, "submit_evidence_record", [
       params.caseId,
-      params.evidenceManifestHash,
-      params.evidenceRoot,
+      params.evidenceClass,
+      params.evidenceType,
+      params.sourceUrl ?? "",
+      params.description,
+      params.commitment,
     ], provider);
+  }
+
+  async function lockEvidence(caseId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "lock_evidence", [caseId], provider);
+  }
+
+  async function submitEvidence(): Promise<`0x${string}`> {
+    throw new Error("Replaceable evidence roots are disabled. Use submitEvidenceRecord.");
   }
 
   async function requestRuling(
@@ -231,11 +348,10 @@ export function useContract() {
   }
 
   async function acceptRuling(
-    caseId: string,
-    rulingId: string
+    _caseId?: string,
+    _rulingId?: string
   ): Promise<`0x${string}`> {
-    const addr = requireAccount();
-    return writeContract(addr, "accept_ruling", [caseId, rulingId], provider);
+    throw new Error("Direct ruling acceptance is disabled. Use appeal or wait for finalization.");
   }
 
   async function appealRuling(
@@ -246,30 +362,88 @@ export function useContract() {
     return writeContract(addr, "appeal_ruling", [caseId, appealPacket], provider);
   }
 
+  async function submitAppealEvidence(params: {
+    caseId: string;
+    evidenceType: string;
+    sourceUrl?: string;
+    description: string;
+    commitment: string;
+  }): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "submit_appeal_evidence", [
+      params.caseId,
+      params.evidenceType,
+      params.sourceUrl ?? "",
+      params.description,
+      params.commitment,
+    ], provider);
+  }
+
+  async function finalizeNoAppeal(caseId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "finalize_no_appeal", [caseId], provider);
+  }
+
+  async function finalizeZeroAwardSettlement(caseId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "finalize_zero_award_settlement", [caseId], provider);
+  }
+
+  async function executeClaimablePayout(caseId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "execute_claimable_payout", [caseId], provider);
+  }
+
+  async function prepareFunderRefund(agreementId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "prepare_funder_refund", [agreementId], provider);
+  }
+
+  async function executeFunderRefund(agreementId: string): Promise<`0x${string}`> {
+    const addr = requireAccount();
+    return writeContract(addr, "execute_funder_refund", [agreementId], provider);
+  }
+
   async function cancelCase(caseId: string): Promise<`0x${string}`> {
     const addr = requireAccount();
     return writeContract(addr, "cancel_case", [caseId], provider);
   }
 
-  async function markSettled(caseId: string): Promise<`0x${string}`> {
-    const addr = requireAccount();
-    return writeContract(addr, "mark_settled", [caseId], provider);
+  async function markSettled(): Promise<`0x${string}`> {
+    throw new Error("Manual settlement marking is disabled. Settlement follows final ruling accounting.");
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
   return {
     // write
+    proposeAgreement,
+    acceptAgreement,
+    cancelAgreement,
+    depositEscrow,
+    openDispute,
     createCase,
     submitClaim,
     submitResponse,
     submitEvidence,
+    submitEvidenceRecord,
+    lockEvidence,
     requestRuling,
     acceptRuling,
     appealRuling,
+    submitAppealEvidence,
+    finalizeNoAppeal,
+    finalizeZeroAwardSettlement,
+    executeClaimablePayout,
+    prepareFunderRefund,
+    executeFunderRefund,
     cancelCase,
     markSettled,
     // read
+    getAgreement,
+    getEscrow,
+    getSettlement,
+    getCaseEvidence,
     getCase,
     getRuling,
     getPartyCases,

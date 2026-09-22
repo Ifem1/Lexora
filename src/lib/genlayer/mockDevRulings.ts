@@ -19,7 +19,7 @@ export function getMockRuling(
   return {
     rulingId: `mock-ruling-${caseId.slice(0, 8)}`,
     caseId,
-    outcome: "PARTIAL_SETTLEMENT",
+    outcome: "PARTIAL",
     confidence: 72,
     remedy: {
       action: "PAY",
@@ -144,7 +144,7 @@ export const MOCK_AUDIT_EVENTS: AuditEvent[] = [
     caseId: "mock-case-001",
     eventType: "RULING_ISSUED",
     actor: "SYSTEM",
-    data: { outcome: "PARTIAL_SETTLEMENT", confidence: 72 },
+    data: { outcome: "PARTIAL", confidence: 72 },
     timestamp: Math.floor(Date.now() / 1000) - 86400,
   },
 ];

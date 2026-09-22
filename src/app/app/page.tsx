@@ -30,11 +30,9 @@ const STATUS_COLORS: Record<string, string> = {
 function AnimatedNumber({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
-  const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    if (started || value === 0) { setDisplay(value); return; }
-    setStarted(true);
+    if (value === 0) return;
     const duration = 1200;
     const start = Date.now();
     const tick = () => {
@@ -43,8 +41,9 @@ function AnimatedNumber({ value }: { value: number }) {
       setDisplay(Math.round(eased * value));
       if (progress < 1) requestAnimationFrame(tick);
     };
-    tick();
-  }, [value, started]);
+    const frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
 
   return <span ref={ref}>{display}</span>;
 }
@@ -76,7 +75,7 @@ export default function AppPage() {
   const [stats, setStats] = useState<ProtocolStats | null>(null);
 
   useEffect(() => {
-    getProtocolStats().then(setStats).catch(console.error);
+    void Promise.resolve().then(getProtocolStats).then(setStats).catch(console.error);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeCases = cases.filter(c => !["SETTLED", "CANCELLED"].includes(c.status)).length;
