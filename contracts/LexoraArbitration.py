@@ -1123,6 +1123,8 @@ class LexoraArbitration(gl.Contract):
         creator = str(gl.message.sender_address)
         zero = "0x0000000000000000000000000000000000000000"
         self._require(creator.lower() != zero, "Creator cannot be the zero address.")
+        counterparty = str(counterparty)
+        funder = str(funder)
         self._require(counterparty.lower() != zero, "Counterparty cannot be the zero address.")
         self._require(creator.lower() != counterparty.lower(), "Creator and counterparty cannot be identical.")
         self._require(funder.lower() in (creator.lower(), counterparty.lower()), "Funder must be the creator or counterparty.")
@@ -1141,8 +1143,13 @@ class LexoraArbitration(gl.Contract):
         self._require(performance_window_days >= u256(1), "Performance window must be positive.")
         self._require(dispute_window_days >= u256(1), "Dispute window must be positive.")
 
-        permitted = json.loads(permitted_remedies_json)
+        permitted = (
+            json.loads(permitted_remedies_json)
+            if isinstance(permitted_remedies_json, str)
+            else permitted_remedies_json
+        )
         self._require(isinstance(permitted, list) and len(permitted) > 0, "At least one permitted remedy is required.")
+        permitted_remedies_json = json.dumps([str(item) for item in permitted])
         for remedy in permitted:
             self._check_remedy(str(remedy))
         self._require(
